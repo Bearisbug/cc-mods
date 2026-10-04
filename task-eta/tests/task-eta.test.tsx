@@ -3,6 +3,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import {
   applyCheck,
   checkPrompt,
+  endingLabel,
   planPrompt,
   describe as describeCall,
   duration,
@@ -56,7 +57,9 @@ describe('Claude checking the existing list', () => {
     const text = '{"same_task":false,"done":[1,2],"current":3,"add":[{"title":"上传产物","signals":["upload"],"minutes":1}]}'
     expect(parseCheck(text)).toEqual({
       isSameTask: false,
+      outcome: null,
       done: [1, 2],
+      skip: [],
       current: 3,
       add: [{ title: '上传产物', signals: ['upload'], minutes: 1 }],
     })
@@ -73,7 +76,7 @@ describe('Claude checking the existing list', () => {
       isUntimed: false,
     }))
     const t = { items, isCurrentHit: true }
-    applyCheck(t, { isSameTask: true, done: [2, 3], current: 4, add: [{ title: '上传产物', signals: ['upload'], minutes: 1 }] }, now)
+    applyCheck(t, { isSameTask: true, outcome: null, done: [2, 3], skip: [], current: 4, add: [{ title: '上传产物', signals: ['upload'], minutes: 1 }] }, now)
     expect(t.items.map(i => `${i.title}:${i.status}`)).toEqual(['跑单元测试:todo', '构建 iOS:done', '截图验证:done', '上传产物:active'])
     expect(t.items[2]?.isUntimed).toBe(true)
     expect(t.isCurrentHit).toBe(false)
@@ -126,7 +129,14 @@ const USAGE = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 
 // 让测试里的「Claude」按提问内容回答：估算给 PLAN_REPLY，核对给 replies.check
 function engine(
   on: Parameters<Parameters<typeof test>[1] extends infer B ? (B extends (...a: infer A) => unknown ? (...a: A) => unknown : never) : never>[1],
-  replies: { check: string; noReplyYet?: boolean; slowCheck?: () => Promise<void>; prompts?: string[] },
+  replies: {
+    check: string
+    noReplyYet?: boolean
+    slowCheck?: () => Promise<void>
+    slowPlan?: () => Promise<void>
+    prompts?: string[]
+    failChecks?: number
+  },
 ) {
   const open = new Set<string>()
   on('turn.start', ($, e) => ({ turnId: e.turnId }))
@@ -136,6 +146,11 @@ function engine(
     replies.prompts?.push(e.prompt)
     const isCheck = e.prompt.includes('核对')
     if (isCheck && replies.slowCheck) await replies.slowCheck()
+    if (!isCheck && replies.slowPlan) await replies.slowPlan()
+    if (isCheck && (replies.failChecks ?? 0) > 0) {
+      replies.failChecks = (replies.failChecks ?? 0) - 1
+      return { value: { isAnswered: false as const, reason: 'api-error' as const, status: 529, error: 'overloaded' as const, usage: USAGE } }
+    }
     return {
       value: replies.noReplyYet
         ? { isAnswered: false as const, reason: 'nothing-to-fork' as const }
@@ -273,7 +288,9 @@ describe('C: the check at a normal end ticks what finished', () => {
   test('parseCheck accepts numbers written as strings and step titles', () => {
     expect(parseCheck('{"done":["1","构建 iOS"],"current":"3"}', ['跑单元测试', '构建 iOS', '截图验证'])).toEqual({
       isSameTask: true,
+      outcome: null,
       done: [1, 2],
+      skip: [],
       current: 3,
       add: [],
     })
@@ -352,4 +369,157 @@ test('F: between a normal end and the check finishing, the band says 正在核�
   await clock.advance(10_000)
   expect(await band.find({ type: 'Text', text: '任务完成' })).toBeDefined()
   await band.unmount()
+})
+
+describe('G: every way a turn can end leaves an honest state', () => {
+  type Dollar = Parameters<Extract<Parameters<typeof test>[1], (...args: never[]) => unknown>>[0]
+  const start = async ($: Dollar, clock: { settle: () => Promise<void> }) => {
+    const band = await $.ui.mount({ plugin: 'task-eta', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
+    await $.turn.start({ text: '跑测试再构建', turnId: 't1' })
+    await $.command.run({ command: 'steps', ...RUN })
+    await clock.settle()
+    return band
+  }
+  const end = (reason: 'answer' | 'aborted' | 'error', answer = '好了') =>
+    ({ answer, durationMs: 1000, isAborted: reason === 'aborted', turnId: 't1', reason }) as const
+
+  test('steps that turned out unnecessary do not keep a finished task open', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { check: '{"outcome":"finished","done":[1],"skip":[],"current":2,"add":[]}' })
+    const band = await start($, clock)
+    await $.turn.complete(end('answer'))
+    await clock.settle()
+    expect(await band.find({ type: 'Text', text: '任务完成' })).toBeDefined()
+    expect(await band.find({ type: 'Text', text: /2 步后来不需要了/ })).toBeDefined()
+    const pane = await $.ui.mount({ plugin: 'task-eta', surface: 'terminal', component: 'Pane', requestId: 'steps', props: PANE_PROPS })
+    expect((await pane.findAll({ type: 'Text', text: /^–$/ })).length).toBe(2)
+    await pane.unmount()
+    await band.unmount()
+  })
+
+  test('Claude stopping to ask reads 等你回复, not 未完成', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { check: '{"outcome":"waiting","done":[1],"current":2,"add":[]}' })
+    const band = await start($, clock)
+    await $.turn.complete(end('answer', '要用 Release 还是 Debug 配置？'))
+    await clock.settle()
+    expect(await band.find({ type: 'Text', text: '等你回复' })).toBeDefined()
+    await band.unmount()
+  })
+
+  test('an API error reads 出错停下 and spends no check', async ($, on) => {
+    const clock = mock.clock(on)
+    const prompts: string[] = []
+    engine(on, { check: '{"done":[1,2,3],"current":3,"add":[]}', prompts })
+    const band = await start($, clock)
+    await $.turn.complete(end('error', ''))
+    await clock.settle()
+    expect(await band.find({ type: 'Text', text: '出错停下' })).toBeDefined()
+    expect(prompts.filter(x => x.includes('核对')).length).toBe(0)
+    await band.unmount()
+  })
+
+  test('a failing final check is retried, and the band stays up for the late result', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { check: '{"done":[1,2,3],"current":3,"add":[]}', failChecks: 2 })
+    const band = await start($, clock)
+    await $.turn.complete(end('answer'))
+    await clock.settle()
+    expect(await band.find({ type: 'Text', text: '正在核对…' })).toBeDefined()
+    await clock.advance(5_000)
+    await clock.advance(10_000)
+    expect(await band.find({ type: 'Text', text: '任务完成' })).toBeDefined()
+    await clock.advance(55_000)
+    expect(await band.find({ type: 'Text', text: '任务完成' })).toBeDefined()
+    await band.unmount()
+  })
+
+  test('three failed final checks read 未能核对, and c in the pane retries', async ($, on) => {
+    const clock = mock.clock(on)
+    const replies = { check: '{"done":[1,2,3],"current":3,"add":[]}', failChecks: 3 }
+    engine(on, replies)
+    const band = await start($, clock)
+    await $.turn.complete(end('answer'))
+    await clock.settle()
+    await clock.advance(5_000)
+    await clock.advance(10_000)
+    expect(await band.find({ type: 'Text', text: '未能核对' })).toBeDefined()
+    const pane = await $.ui.mount({ plugin: 'task-eta', surface: 'terminal', component: 'Pane', requestId: 'steps', props: PANE_PROPS })
+    await pane.press({ key: 'recheck' })
+    await clock.settle()
+    expect(await band.find({ type: 'Text', text: '任务完成' })).toBeDefined()
+    await pane.unmount()
+    await band.unmount()
+  })
+
+  test('the final check still runs after the task used up its model-call budget', async ($, on) => {
+    const clock = mock.clock(on)
+    const prompts: string[] = []
+    const replies = { check: '{"outcome":"unfinished","done":[],"current":1,"add":[]}', prompts }
+    engine(on, replies)
+    const band = await start($, clock)
+    // 每一轮「没做完 → 收尾核对 → 下一条消息续上 → 续接核对」都会用掉调用次数
+    for (let round = 2; round <= 4; round++) {
+      await $.turn.complete(end('answer', '先做到这'))
+      await clock.settle()
+      await $.turn.start({ text: '继续', turnId: `t${round}` })
+      await clock.settle()
+    }
+    // 估算 1 次 + 3 轮收尾核对 + 2 次续接核对 = 6，第 3 次续接核对已经被 6 次上限挡掉
+    expect(prompts.length).toBe(6)
+    replies.check = '{"outcome":"finished","done":[1,2,3],"current":3,"add":[]}'
+    const before = prompts.length
+    await $.turn.complete(end('answer'))
+    await clock.settle()
+    expect(prompts.length).toBe(before + 1)
+    expect(await band.find({ type: 'Text', text: '任务完成' })).toBeDefined()
+    await band.unmount()
+  })
+
+  test('d in the pane closes out a stale list by hand', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { check: '{"outcome":"unfinished","done":[1],"current":2,"add":[]}' })
+    const band = await start($, clock)
+    await $.turn.complete(end('answer'))
+    await clock.settle()
+    expect(await band.find({ type: 'Text', text: '未完成' })).toBeDefined()
+    const pane = await $.ui.mount({ plugin: 'task-eta', surface: 'terminal', component: 'Pane', requestId: 'steps', props: PANE_PROPS })
+    await pane.press({ key: 'finish' })
+    expect(await band.find({ type: 'Text', text: '任务完成' })).toBeDefined()
+    await pane.unmount()
+    await band.unmount()
+  })
+
+  test('/clear drops the list', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { check: '{"outcome":"unfinished","done":[1],"current":2,"add":[]}' })
+    on('session.end', ($, e) => ({ sessionId: e.sessionId }))
+    const band = await start($, clock)
+    await $.turn.complete(end('aborted', ''))
+    expect(await band.find({ type: 'Text', text: '已中断' })).toBeDefined()
+    await $.session.end({ reason: 'clear', sessionId: 's1', resume: { id: 's1' } })
+    expect(await band.find({ text: /▍进度/ })).toBeUndefined()
+    const pane = await $.ui.mount({ plugin: 'task-eta', surface: 'terminal', component: 'Pane', requestId: 'steps', props: PANE_PROPS })
+    expect(await pane.find({ text: /还没有任务记录/ })).toBeDefined()
+    await pane.unmount()
+    await band.unmount()
+  })
+
+  test('an estimate that lands after a short turn ended still gets its wrap-up', async ($, on) => {
+    const clock = mock.clock(on)
+    engine(on, { check: '{"outcome":"finished","done":[1,2],"current":3,"add":[]}', slowPlan: () => clock.sleep(10_000) })
+    const band = await $.ui.mount({ plugin: 'task-eta', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
+    await $.turn.start({ text: '跑测试再构建', turnId: 't1' })
+    await $.command.run({ command: 'steps', ...RUN })
+    await $.turn.complete(end('answer'))
+    await clock.settle()
+    await clock.advance(10_000)
+    expect(await band.find({ type: 'Text', text: '任务完成' })).toBeDefined()
+    await band.unmount()
+  })
+
+  test('endingLabel names every ending', () => {
+    expect(endingLabel('paused', false)).toBe('未完成')
+    expect(endingLabel('done', true)).toBe('正在核对…')
+  })
 })

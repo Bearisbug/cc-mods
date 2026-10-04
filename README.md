@@ -58,9 +58,9 @@ claude plugin install ctx-slim@cc-mods
 
 - 一轮任务跑满 3 分钟，task-eta 向当前会话的模型发一个旁路问题，估出剩余步骤；不满 3 分钟时按一下 ctrl+x p 会当场估算。
 - 输入框上方出现紫色进度行，例如「▍进度 2/5 跑单元测试 ▰▰▱▱ 已 4 分 · 约剩 6 分 · 下一步 修复失败用例 · ctrl+x p 看步骤」。剩余时间按已完成步骤的实际快慢校准。
-- `/steps`（ctrl+x p）展开「任务步骤」面板：每一步用 ✓ / ▶ / ○ 标状态，写着实际用时、预计用时和调用次数，当前步骤下面显示 Claude 正在执行的命令。
-- 只有下一步真正开始、或 Claude 核对确认后，才给一步打勾。一轮被中断后，发下一条消息会接着原来那份清单，不重新估算。
-- 估算和核对都通过 `$.model.fork` 发请求，每轮最多 6 次。请求复用会话的 prompt cache，但仍然计入你的用量。
+- `/steps`（ctrl+x p）展开「任务步骤」面板：每一步用 ✓ / ▶ / ○ 标状态，「–」表示 Claude 核对后认为这一步后来不需要了；每一步写着实际用时、预计用时和调用次数，当前步骤下面显示 Claude 正在执行的命令。面板里按 `c` 让 Claude 重新核对；一轮已经结束、清单还没完成时，按 `d` 把整份清单标为完成。
+- 只有下一步真正开始、或 Claude 核对确认后，才给一步打勾。一轮结束时 Claude 核对一次，进度行显示结果：任务完成、等你回复、未完成、已中断、出错停下；核对试了 3 次都没成功时显示「未能核对」。被中断或没做完时，发下一条消息会接着原来那份清单，不重新估算；`/clear` 会清掉清单。
+- 估算和过程中的核对通过 `$.model.fork` 发请求，每轮最多 6 次；一轮结束时的核对不受这个次数限制，失败后隔 5 秒、10 秒各重试一次。请求复用会话的 prompt cache，但仍然计入你的用量。
 
 ## ctx-slim · 按目录精简 MCP 说明
 
@@ -106,7 +106,7 @@ mod 以你的用户权限在 Claude Code 进程里运行，不在沙箱里。装
 | mod | 处理的事件 | 调用的接口 |
 |---|---|---|
 | shot-view | `tool.call`、`command.run`、`ui.render` | `$.process.run`（只运行 `sips`、`open`）、`$.fs.stat`、`$.ui.*`、`$.state.*` |
-| task-eta | `turn.start`、`tool.call`、`turn.complete`、`command.run`、`ui.render` | `$.model.fork`、`$.clock.*`、`$.ui.*` |
+| task-eta | `turn.start`、`tool.call`、`turn.complete`、`command.run`、`session.end`、`ui.render` | `$.model.fork`、`$.clock.*`、`$.ui.*` |
 | ctx-slim | `prompt.attachment`、`ui.render`（没配规则时不注册任何钩子） | `$.fs.exists`、`$.fs.ancestors`、`$.env.get`、`$.ui.*`、`$.state.*` |
 
 ## 开发

@@ -3,14 +3,17 @@ import type { EngineInterface, Register, Timer } from 'claude-code'
 type Api = EngineInterface
 type Step = { title: string; signals: string[]; minutes: number }
 type Item = Step & {
-  status: 'done' | 'active' | 'todo'
+  // skipped：Claude 核对说这一步后来不需要了
+  status: 'done' | 'skipped' | 'active' | 'todo'
   startedAt: number
   endedAt: number
   tools: number
   // 打勾时没有观察到它的起止（由 Claude 核对确认完成），不显示用时
   isUntimed: boolean
 }
-type Ending = 'running' | 'aborted' | 'paused' | 'done'
+// paused＝没做完就停了；waiting＝停下来等你回复或等后台任务；error＝API 出错或拒答；unchecked＝收尾核对试了 3 次都没成功
+type Ending = 'running' | 'aborted' | 'error' | 'waiting' | 'paused' | 'unchecked' | 'done'
+type Outcome = 'finished' | 'waiting' | 'unfinished'
 // 一个任务可以跨好几轮：被中断、或停下来问你之后，下一条消息接着同一份清单
 type Task = {
   text: string
@@ -28,13 +31,15 @@ type Task = {
   isBusy: boolean
   isAsked: boolean
   isWaitingFirstReply: boolean
-  // 正常收尾后等 Claude 核对的那几秒，显示「正在核对」而不是「已暂停」
+  // 正常收尾后等 Claude 核对的那几秒，显示「正在核对」而不是「未完成」
   isFinalChecking: boolean
+  // 这一轮 Claude 最后的回复，收尾核对和面板里按 c 重新核对时用
+  lastAnswer: string
   // 这一轮执行过的工具调用（一行一条），估算时交给 Claude，免得把做完的步骤再列一遍
   trail: string[]
   timer: Timer | null
 }
-type Check = { isSameTask: boolean; done: number[]; current: number; add: Step[] }
+type Check = { isSameTask: boolean; outcome: Outcome | null; done: number[]; skip: number[]; current: number; add: Step[] }
 
 const PLAN_AFTER_MS = 3 * 60_000
 const CHECK_GAP_MS = 3 * 60_000
@@ -100,14 +105,18 @@ export function checkPrompt(items: Item[], context: { newText?: string; answer?:
     context.newText === undefined
       ? ''
       : `\n用户刚发来的新消息是：「${context.newText}」。如果它是在接着或调整这份清单的任务，same_task 为 true；如果换成了另一件事，same_task 为 false。\n`
-  const ended = context.answer === undefined ? '' : `\n这一轮已经结束，你最后的回复是：「${context.answer.slice(0, 400)}」。\n`
+  const isFinal = context.answer !== undefined
+  const ended = isFinal
+    ? `\n这一轮已经结束，你最后的回复是：「${(context.answer ?? '').slice(0, 400)}」。
+outcome 是用户交代的整件事现在的状态：finished＝已经做完（清单里有的步骤后来没做、也不需要了，照样算 finished）；waiting＝停下来等用户回复、确认或操作，或者在等后台任务跑完；unfinished＝没做完就停了（出错、放弃、只做了一半）。\n`
+    : ''
   return `这是一个旁路问题：只回答，不要调用任何工具。
 这一轮任务的步骤清单如下（编号从 1 开始）：
 ${list}
 ${latest}${ended}
 对照你到目前为止实际做过的工具调用和它们的结果，核对每一步：这一步要做的命令已经执行完、没有报错，就算完成；没有输出的命令（如 sleep、等待）执行完也算完成；还没执行或报错了的不算。只输出一个 JSON 对象，不要任何别的文字：
-{"same_task":true,"done":[已完成的编号],"current":正在做或下一步要做的编号,"add":[{"title":"不超过 14 个字","signals":["1 到 3 个关键词"],"minutes":预计分钟数}]}
-add 只列清单里没有、但完成任务还必须做的步骤，没有就给空数组。`
+{"same_task":true,${isFinal ? '"outcome":"finished",' : ''}"done":[已完成的编号],"skip":[后来不需要做的编号],"current":正在做或下一步要做的编号,"add":[{"title":"不超过 14 个字","signals":["1 到 3 个关键词"],"minutes":预计分钟数}]}
+skip 只放确定不用做了的步骤；add 只列清单里没有、但完成任务还必须做的步骤；没有就给空数组。`
 }
 
 // 模型偶尔把编号写成字符串，或直接写步骤名：都按编号收下
@@ -122,10 +131,13 @@ function toIndex(v: unknown, titles: string[]): number {
 export function parseCheck(text: string, titles: string[] = []): Check | null {
   const raw = jsonOf(text)
   if (!raw) return null
-  const done = (Array.isArray(raw.done) ? raw.done : []).map(v => toIndex(v, titles)).filter(n => n > 0)
+  const indexes = (v: unknown) => (Array.isArray(v) ? v : []).map(x => toIndex(x, titles)).filter(n => n > 0)
+  const outcome = typeof raw.outcome === 'string' ? raw.outcome.trim().toLowerCase() : ''
   return {
     isSameTask: raw.same_task !== false && raw.same_task !== 'false',
-    done,
+    outcome: outcome === 'finished' || outcome === 'waiting' || outcome === 'unfinished' ? outcome : null,
+    done: indexes(raw.done),
+    skip: indexes(raw.skip),
     current: toIndex(raw.current, titles),
     add: parseSteps(raw.add),
   }
@@ -206,6 +218,7 @@ function newTask(text: string): Task {
     isAsked: false,
     isWaitingFirstReply: false,
     isFinalChecking: false,
+    lastAnswer: '',
     trail: [],
     timer: null,
   }
@@ -220,7 +233,17 @@ function active(t: Task): number {
 }
 
 function isAllDone(t: Task): boolean {
-  return t.items.length > 0 && t.items.every(i => i.status === 'done')
+  return t.items.length > 0 && t.items.every(i => i.status === 'done' || i.status === 'skipped')
+}
+
+function finishedCount(t: Task): number {
+  return t.items.filter(i => i.status === 'done' || i.status === 'skipped').length
+}
+
+// 一轮结束后条带和面板上的状态词
+export function endingLabel(ending: Ending, isFinalChecking: boolean): string {
+  if (isFinalChecking) return '正在核对…'
+  return { running: '进行中', aborted: '已中断', error: '出错停下', waiting: '等你回复', paused: '未完成', unchecked: '未能核对', done: '任务完成' }[ending]
 }
 
 function pace(t: Task): number {
@@ -255,12 +278,13 @@ function item(step: Step, status: Item['status'], now: number): Item {
   return { ...step, status, startedAt: status === 'active' ? now : 0, endedAt: 0, tools: 0, isUntimed: false }
 }
 
-async function ask($: Api, t: Task, prompt: string): Promise<string | null> {
-  if (t.isBusy || t.calls >= MAX_MODEL_CALLS) return null
-  t.isBusy = true
+// 收尾核对和手动核对是 forced：不受 MAX_MODEL_CALLS 限制，也不因为别的调用在跑就跳过
+async function ask($: Api, t: Task, prompt: string, isForced = false): Promise<string | null> {
+  if (!isForced && (t.isBusy || t.calls >= MAX_MODEL_CALLS)) return null
+  if (!isForced) t.isBusy = true
   redraw($)
   const reply = await $.model.fork({ prompt }).catch(() => undefined)
-  t.isBusy = false
+  if (!isForced) t.isBusy = false
   // 新会话第一条回复出来之前没有可分叉的对话：不算一次调用，稍后自动重试
   t.isWaitingFirstReply = reply !== undefined && !reply.isAnswered && reply.reason === 'nothing-to-fork'
   if (!t.isWaitingFirstReply) {
@@ -290,48 +314,91 @@ async function estimate($: Api, t: Task) {
     // 估算约定「正在执行的那一步算第一步」：已经有工具调用时，第一步就算在做了
     t.isCurrentHit = t.tools > 0
     t.firstEstimate = Math.round(elapsed(t, now) / MINUTE + steps.reduce((acc, s) => acc + s.minutes, 0))
+    // 估算回来时这一轮已经结束（短任务常见）：补上收尾，不然清单会一直停在第 1 步
+    if (t.ending !== 'running') {
+      showEnding($)
+      if (t.ending === 'paused') {
+        t.isFinalChecking = true
+        finalCheck($, t)
+      }
+    }
   }
   redraw($)
 }
 
 // 之后：不再重估，只请 Claude 核对现有清单——哪些真的做完了、正在做哪步、要不要补步骤
-async function check($: Api, t: Task, context: { newText?: string; answer?: string } = {}) {
-  if (t.items.length === 0) return
+async function check($: Api, t: Task, context: { newText?: string; answer?: string } = {}): Promise<Check | null> {
+  if (t.items.length === 0) return null
   const newText = context.newText
-  const text = await ask($, t, checkPrompt(t.items, context))
+  const text = await ask($, t, checkPrompt(t.items, context), context.answer !== undefined)
   const result = text ? parseCheck(text, t.items.map(i => i.title)) : null
   if (task !== t || !result) {
     redraw($)
-    return
+    return result
   }
   if (!result.isSameTask && newText !== undefined) {
     const fresh = newTask(newText)
     fresh.timer = t.timer
     task = fresh
     void estimate($, fresh)
-    return
+    return result
   }
   applyCheck(t, result, Date.now())
   redraw($)
+  return result
+}
+
+function showEnding($: Api) {
+  bandUntil = Math.max(bandUntil, Date.now() + BAND_AFTER_MS)
+  bandTimer?.cancel()
+  bandTimer = $.clock.after(BAND_AFTER_MS, () => redraw($))
+  redraw($)
+}
+
+// 收尾核对：等手上的估算或核对回来（最多 60 秒），一定核对一次；失败隔 5 秒、10 秒各重试一次
+function finalCheck($: Api, t: Task, attempt = 0, waited = 0) {
+  if (task !== t || t.ending === 'running') return
+  if (t.isBusy && waited < 20) {
+    $.clock.after(3000, () => finalCheck($, t, attempt, waited + 1))
+    return
+  }
+  t.isFinalChecking = true
+  redraw($)
+  void check($, t, { answer: t.lastAnswer }).then(result => {
+    if (task !== t || t.ending === 'running') return
+    if (!result && attempt < 2) {
+      $.clock.after(5000 * (attempt + 1), () => finalCheck($, t, attempt + 1, waited))
+      return
+    }
+    t.isFinalChecking = false
+    t.ending = !result ? 'unchecked' : isAllDone(t) ? 'done' : result.outcome === 'waiting' ? 'waiting' : 'paused'
+    showEnding($)
+  })
 }
 
 export function applyCheck(t: { items: Item[]; isCurrentHit: boolean }, result: Check, now: number) {
   const done = new Set(result.done.map(n => n - 1))
-  const added = result.add.slice(0, Math.max(0, MAX_ITEMS - t.items.length)).map(s => item(s, 'todo', now))
+  const skip = new Set(result.skip.map(n => n - 1).filter(i => !done.has(i)))
+  // 整件事已经做完：剩下没打勾的步骤都算「不需要了」，新补的步骤也不再加
+  const isFinished = result.outcome === 'finished'
+  const added = isFinished ? [] : result.add.slice(0, Math.max(0, MAX_ITEMS - t.items.length)).map(s => item(s, 'todo', now))
   t.items.push(...added)
   t.items.forEach((it, i) => {
     if (done.has(i)) {
       if (it.status === 'active') Object.assign(it, { status: 'done', endedAt: now })
-      else if (it.status === 'todo') Object.assign(it, { status: 'done', startedAt: now, endedAt: now, isUntimed: true })
-    } else if (it.status === 'done') {
+      else if (it.status !== 'done') Object.assign(it, { status: 'done', startedAt: now, endedAt: now, isUntimed: true })
+    } else if (skip.has(i) || isFinished) {
+      if (it.status !== 'done' || !isFinished) Object.assign(it, { status: 'skipped', endedAt: now, isUntimed: true })
+    } else if (it.status === 'done' || it.status === 'skipped') {
       Object.assign(it, { status: 'todo', startedAt: 0, endedAt: 0, isUntimed: false })
     }
   })
+  const isOpen = (it: Item | undefined) => it !== undefined && (it.status === 'todo' || it.status === 'active')
   const wanted = result.current - 1
-  const target = t.items[wanted] && t.items[wanted].status !== 'done' ? wanted : t.items.findIndex(i => i.status !== 'done')
+  const target = isOpen(t.items[wanted]) ? wanted : t.items.findIndex(isOpen)
   const previous = active(t as Task)
   t.items.forEach((it, i) => {
-    if (it.status === 'done') return
+    if (!isOpen(it)) return
     if (i === target) {
       if (it.status !== 'active') Object.assign(it, { status: 'active', startedAt: now })
     } else if (it.status === 'active') {
@@ -352,6 +419,26 @@ function tick($: Api) {
     void check($, t)
   }
   if (isRunningVisible(t, now)) redraw($)
+}
+
+// 面板里按 c：跑着的时候普通核对；结束后按收尾核对重新判一次
+async function recheck($: Api, t: Task) {
+  if (t.ending === 'running') {
+    await check($, t)
+    return
+  }
+  finalCheck($, t)
+}
+
+// 面板里按 d：你确认整件事做完了，没打勾的都算完成
+function finishByHand($: Api, t: Task) {
+  const now = Date.now()
+  for (const it of t.items) {
+    if (it.status !== 'done' && it.status !== 'skipped') Object.assign(it, { status: 'done', endedAt: now, isUntimed: it.status !== 'active' })
+  }
+  t.ending = 'done'
+  t.isFinalChecking = false
+  showEnding($)
 }
 
 export const register: Register = on => {
@@ -375,9 +462,19 @@ export const register: Register = on => {
       t.isAsked = true
       if (t.items.length === 0) void estimate($, t)
     }
-    await $.ui.open({ id: PANE, title: '任务步骤', focus: true, closeOnEscape: true, rows: Math.max(t?.items.length ?? 0, 4) + 8 })
+    await $.ui.open({ id: PANE, title: '任务步骤', focus: true, closeOnEscape: true, rows: Math.max(t?.items.length ?? 0, 4) + 10 })
     redraw($)
     return {}
+  })
+
+  // /clear 或会话结束：清掉清单，不把上一段对话的进度带进新对话
+  on('session.end', async ($, e, next) => {
+    task?.timer?.cancel()
+    bandTimer?.cancel()
+    task = null
+    bandUntil = 0
+    redraw($)
+    return next(e)
   })
 
   on('turn.start', async ($, e, next) => {
@@ -439,21 +536,15 @@ export const register: Register = on => {
       t.activeMs += now - t.segmentStart
       t.segmentStart = 0
       t.pausedAt = now
-      t.ending = e.isAborted ? 'aborted' : 'paused'
+      t.lastAnswer = e.answer
+      // 被 Esc 打断、API 出错或拒答：不去核对（多半也会失败），下一条消息接着这份清单
+      t.ending = e.reason === 'aborted' ? 'aborted' : e.reason === 'error' || e.reason === 'refusal' ? 'error' : 'paused'
       if (t.items.length > 0) {
         bandUntil = now + BAND_AFTER_MS
         bandTimer = $.clock.after(BAND_AFTER_MS, () => redraw($))
-        if (!e.isAborted) {
-          // 正常结束时核对一次，清单如实反映哪些做完了
-          const answer = e.answer
+        if (t.ending === 'paused') {
           t.isFinalChecking = true
-          whenIdle($, t, () =>
-            void check($, t, { answer }).then(() => {
-              t.isFinalChecking = false
-              if (task === t && t.ending === 'paused' && isAllDone(t)) t.ending = 'done'
-              redraw($)
-            }),
-          )
+          finalCheck($, t)
         }
       }
       redraw($)
@@ -471,16 +562,19 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const at = active(t)
     const cur = t.items[at]
-    const doneCount = t.items.filter(i => i.status === 'done').length
+    const doneCount = finishedCount(t)
 
     let body
     if (!isRunning) {
-      const word = t.isFinalChecking ? '正在核对…' : t.ending === 'done' ? '任务完成' : t.ending === 'aborted' ? '已中断' : '已暂停'
+      const word = endingLabel(t.ending, t.isFinalChecking)
+      const skipped = t.items.filter(i => i.status === 'skipped').length
       const tail = t.isFinalChecking
         ? `Claude 在确认哪些步骤真的做完了 · 已打勾 ${doneCount}/${t.items.length}`
         : t.ending === 'done'
-          ? `用时 ${spent(elapsed(t, now))}`
-          : `完成 ${doneCount}/${t.items.length} 步 · 下一条消息接着这份清单`
+          ? `用时 ${spent(elapsed(t, now))}${skipped > 0 ? ` · ${skipped} 步后来不需要了` : ''}`
+          : t.ending === 'unchecked'
+            ? `完成 ${doneCount}/${t.items.length} 步（未经 Claude 确认）· 面板里按 c 重试`
+            : `完成 ${doneCount}/${t.items.length} 步 · 下一条消息接着这份清单`
       body = [
         <Text key="word">{word}</Text>,
         <Text key="tail" dimColor>
@@ -524,7 +618,7 @@ export const register: Register = on => {
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const now = Date.now()
     const t = task
     const width = Math.max(40, e.props.bodyColumns - 2)
@@ -546,27 +640,29 @@ export const register: Register = on => {
     }
 
     const at = active(t)
-    const doneCount = t.items.filter(i => i.status === 'done').length
+    const doneCount = finishedCount(t)
     const parts = [`已 ${spent(elapsed(t, now))}`]
     if (t.ending === 'running') {
       if (at >= 0) parts.push(left(t, now) > 0 ? `约剩 ${duration(left(t, now))}` : '已超出预估', `第 ${at + 1}/${t.items.length} 步`)
       else parts.push(`${t.tools} 次工具调用`)
       if (t.isBusy && t.items.length > 0) parts.push('Claude 正在核对进度…')
     } else {
-      parts.unshift(t.isFinalChecking ? '正在核对…' : t.ending === 'done' ? '任务完成' : t.ending === 'aborted' ? '已中断' : '已暂停')
+      parts.unshift(endingLabel(t.ending, t.isFinalChecking))
       parts.push(`完成 ${doneCount}/${t.items.length} 步`)
-      if (t.ending !== 'done' && !t.isFinalChecking) parts.push('下一条消息接着这份清单')
+      if (t.ending === 'unchecked') parts.push('没能让 Claude 确认，按 c 重试')
+      else if (t.ending !== 'done' && !t.isFinalChecking) parts.push('下一条消息接着这份清单')
     }
 
     const stepRow = (it: Item, n: number) => {
       const isNow = it.status === 'active'
       const isLive = isNow && t.ending === 'running'
-      const mark = it.status === 'done' ? '✓' : isNow ? '▶' : '○'
+      const mark = it.status === 'done' ? '✓' : it.status === 'skipped' ? '–' : isNow ? '▶' : '○'
       const markColor = it.status === 'done' ? 'success' : isNow ? 'autoAccept' : undefined
       const inStep = (t.ending === 'running' ? now : t.pausedAt) - it.startedAt
       const calls = it.tools > 0 ? ` · ${it.tools} 次调用` : ''
       let note
-      if (it.status === 'done') note = it.isUntimed ? '已完成（Claude 核对确认）' : `${spent(it.endedAt - it.startedAt)}（预计 ${duration(it.minutes)}）${calls}`
+      if (it.status === 'done') note = it.isUntimed ? '已完成（核对确认）' : `${spent(it.endedAt - it.startedAt)}（预计 ${duration(it.minutes)}）${calls}`
+      else if (it.status === 'skipped') note = '后来不需要了（核对确认）'
       else if (isNow) note = `${spent(inStep)} / 预计 ${duration(it.minutes)}${calls}${isLive ? '' : ' · 已暂停'}`
       else note = `预计 ${duration(it.minutes)}`
       return (
@@ -579,7 +675,7 @@ export const register: Register = on => {
               <Text dimColor={!isNow}>{String(n + 1)}</Text>
             </Box>
             <Box width={titleWidth}>
-              <Text bold={isNow} dimColor={it.status === 'done'}>
+              <Text bold={isNow} dimColor={it.status === 'done' || it.status === 'skipped'} strikethrough={it.status === 'skipped'}>
                 {it.title}
               </Text>
             </Box>
@@ -618,6 +714,18 @@ export const register: Register = on => {
                   : '还没有步骤估算（跑满 3 分钟或按 ctrl+x p 时估算）'}
             </Text>
             {t.ending === 'running' && t.activity !== '' && <Text color="ide">└ {t.activity}</Text>}
+          </Box>
+        )}
+        {t.items.length > 0 && (
+          <Box flexDirection="row" gap={2} marginTop={1}>
+            <Button key="recheck" plain hotkey="c" onPress={() => void recheck($, t)}>
+              让 Claude 重新核对
+            </Button>
+            {t.ending !== 'running' && t.ending !== 'done' && (
+              <Button key="finish" plain hotkey="d" onPress={() => finishByHand($, t)}>
+                整份标为完成
+              </Button>
+            )}
           </Box>
         )}
         {footer}
