@@ -20,6 +20,19 @@ function unreadOf(list: Shot[]): Shot[] {
   return list.filter(s => !s.readAt)
 }
 
+// 文件现在还在不在、修改时间是多少：被删掉、移走或还是空文件的不显示（不然终端只能画一块黑），
+// 被原地覆盖的把修改时间交给终端，让它重新读，不用缓存里的旧图
+async function present($: Api, list: Shot[]): Promise<Map<string, number>> {
+  const out = new Map<string, number>()
+  await Promise.all(
+    list.map(async s => {
+      const stat = await $.fs.stat(s.path).catch(() => undefined)
+      if (stat?.kind === 'file' && stat.size > 0) out.set(s.path, Math.floor(stat.mtimeMs))
+    }),
+  )
+  return out
+}
+
 export function findPngPaths(text: string): string[] {
   return [...new Set(text.match(/[\w@%+=:,.\/~-]+\.png\b/gi) ?? [])]
 }
@@ -98,7 +111,9 @@ async function undoRead($: Api) {
     return cur.map(s => (s.path === restored ? { ...s, readAt: 0 } : s))
   })
   if (restored === '') return
-  const at = unreadOf(await read($, shots)).findIndex(s => s.path === restored)
+  const unread = unreadOf(await read($, shots))
+  const live = await present($, unread)
+  const at = unread.filter(s => live.has(s.path)).findIndex(s => s.path === restored)
   await update($, index, () => Math.max(0, at))
 }
 
@@ -136,7 +151,7 @@ export const register: Register = on => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const below = await next(e)
     if (!hint || e.props.hasSurvey) return below
-    const unread = unreadOf(await read($, shots)).length
+    const unread = (await present($, unreadOf(await read($, shots)))).size
     if (unread === 0) return below
     const { Box, Text } = $.ui.resolve(e)
     return (
@@ -156,8 +171,11 @@ export const register: Register = on => {
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const list = await read($, shots)
-    const unread = unreadOf(list)
-    const readCount = list.length - unread.length
+    const unreadAll = unreadOf(list)
+    const live = await present($, unreadAll)
+    const unread = unreadAll.filter(s => live.has(s.path))
+    const gone = unreadAll.length - unread.length
+    const readCount = list.length - unreadAll.length
     const at = Math.min(await read($, index), Math.max(0, unread.length - 1))
     const shot = unread[at]
     const undo = (
@@ -166,6 +184,7 @@ export const register: Register = on => {
       </Button>
     )
     const closeHint = <Text dimColor>Esc 或 ctrl+x s 关闭（面板开着时 Esc 只关面板，不会中断 Claude）</Text>
+    const goneNote = gone > 0 && <Text dimColor>另有 {gone} 张截图的文件已不在（被删除或移走），不再显示</Text>
     if (list.length === 0) {
       return (
         <Box paddingX={1}>
@@ -178,17 +197,20 @@ export const register: Register = on => {
         <Box flexDirection="column" paddingX={1}>
           <Box flexDirection="row" gap={1}>
             <Text color="success">✓</Text>
-            <Text bold>截图都看完了</Text>
-            <Text dimColor>已读 {readCount} 张</Text>
+            <Text bold>{readCount === 0 ? '没有可看的截图' : '截图都看完了'}</Text>
+            {readCount > 0 && <Text dimColor>已读 {readCount} 张</Text>}
           </Box>
-          {undo}
+          {goneNote}
+          {readCount > 0 && undo}
           {closeHint}
         </Box>
       )
     }
 
+    // 按面板真正能显示的高度缩图：标题、路径、两排按键和两行说明约占 8 行，图片太高会把按键挤出去
     const maxColumns = Math.max(10, e.props.bodyColumns - 2)
-    const maxRows = Math.max(6, (e.viewport?.rows ?? 30) - 9)
+    const visibleRows = Math.min(e.props.scroll.bodyRows, e.viewport?.rows ?? e.props.scroll.bodyRows)
+    const maxRows = Math.max(4, visibleRows - 8 - (gone > 0 ? 1 : 0))
     let columns = maxColumns
     let rows = Math.round((columns * shot.height) / shot.width / 2)
     if (rows > maxRows) {
@@ -200,7 +222,15 @@ export const register: Register = on => {
       e.surface === 'terminal' ? (
         (() => {
           const { Image } = $.ui.resolve(e)
-          return <Image key="shot" source={{ file: shot.path, format: 'png' }} columns={columns} rows={Math.min(255, rows)} alt={alt} />
+          return (
+            <Image
+              key="shot"
+              source={{ file: shot.path, format: 'png', generation: live.get(shot.path) ?? 0 }}
+              columns={columns}
+              rows={Math.min(255, rows)}
+              alt={alt}
+            />
+          )
         })()
       ) : (
         <Text dimColor>{alt}</Text>
@@ -221,6 +251,7 @@ export const register: Register = on => {
         <Text dimColor wrap="wrap">
           {shot.path}
         </Text>
+        {goneNote}
         {picture}
         <Box flexDirection="row" gap={2}>
           <Button key="prev" plain hotkey="p" onPress={() => void update($, index, n => Math.min(n + 1, unread.length - 1))}>

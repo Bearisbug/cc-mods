@@ -77,11 +77,11 @@ test('a screenshot taken by Bash shows in the pane, and the pane pages back', as
 
   const ui = await $.ui.mount({ plugin: 'shot-view', surface: 'terminal', component: 'Pane', requestId: 'shots', props: PANE_PROPS })
   const image = await ui.find({ type: 'Image' })
-  expect(image?.props.source).toEqual({ file: '/w/shots/home.png', format: 'png' })
+  expect(image?.props.source).toMatchObject({ file: '/w/shots/home.png', format: 'png' })
   expect(await ui.find({ text: '1/2' })).toBeDefined()
 
   await ui.press({ key: 'prev' })
-  expect((await ui.find({ type: 'Image' }))?.props.source).toEqual({ file: '/w/shots/old.png', format: 'png' })
+  expect((await ui.find({ type: 'Image' }))?.props.source).toMatchObject({ file: '/w/shots/old.png', format: 'png' })
   await ui.unmount()
 
   const desktop = await $.ui.mount({ plugin: 'shot-view', surface: 'desktop', component: 'Pane', requestId: 'shots', props: PANE_PROPS })
@@ -146,4 +146,61 @@ test('r marks a shot read so it leaves the pane, u brings it back, an unchanged 
   const band = await $.ui.mount({ plugin: 'shot-view', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
   expect(await band.find({ type: 'Text', text: '未读 2 张 · ctrl+x s 查看' })).toBeDefined()
   await band.unmount()
+})
+
+test('a deleted file leaves the pane instead of drawing a black box; an overwritten one is re-read; the picture fits the pane', async ($, on) => {
+  const base = Date.now()
+  const files: Record<string, number | undefined> = { '/w/a.png': base, '/w/b.png': base, '/w/c.png': base }
+  const ok = (stdout: string) => ({
+    value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false },
+  })
+  on('env.get', () => ({ value: '/Users/x' }))
+  on('session.cwd', () => ({ value: '/w' }))
+  on('fs.stat', ($, e) => {
+    const mtimeMs = files[e.path]
+    return mtimeMs === undefined
+      ? { deny: `ENOENT: ${e.path}` }
+      : { value: { kind: 'file' as const, size: 10, mtimeMs, isLink: false } }
+  })
+  on('process.run', () => ok('pixelWidth: 1290\n  pixelHeight: 2796\n'))
+  on('ui.panes', () => ({ value: [] }))
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
+  on('tool.call', () => ({ result: { stdout: '', stderr: '', interrupted: false }, text: '' }))
+  for (const name of ['a.png', 'b.png', 'c.png']) await $.tool.call({ tool: 'Bash', command: `screencapture ${name}` })
+  const props = { ...PANE_PROPS, scroll: { offset: 0, bodyRows: 20 } }
+  const mount = () => $.ui.mount({ plugin: 'shot-view', surface: 'terminal', component: 'Pane', requestId: 'shots', props })
+  const source = async (ui: Awaited<ReturnType<typeof mount>>) =>
+    (await ui.find({ type: 'Image' }))?.props as { source: { file: string; generation?: number }; rows: number } | undefined
+
+  // c.png 被删掉：不画黑框，跳到下一张还在的，并说明少了一张
+  files['/w/c.png'] = undefined
+  let pane = await mount()
+  expect((await source(pane))?.source.file).toBe('/w/b.png')
+  expect(await pane.find({ type: 'Text', text: /未读 1\/2/ })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /另有 1 张截图的文件已不在/ })).toBeDefined()
+  // 竖长图按面板可见高度缩：20 行减去按键、说明和提示
+  expect((await source(pane))?.rows).toBeLessThanOrEqual(11)
+  await pane.unmount()
+
+  const band = await $.ui.mount({ plugin: 'shot-view', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
+  expect(await band.find({ type: 'Text', text: '未读 2 张 · ctrl+x s 查看' })).toBeDefined()
+  await band.unmount()
+
+  // b.png 被原地覆盖：把新的修改时间交给终端，让它重新读
+  files['/w/b.png'] = base + 7_000
+  pane = await mount()
+  expect((await source(pane))?.source.generation).toBe(Math.floor(base + 7_000))
+  await pane.unmount()
+
+  // 全都没了：说清楚，而不是空着
+  files['/w/a.png'] = undefined
+  files['/w/b.png'] = undefined
+  pane = await mount()
+  expect(await pane.find({ type: 'Image' })).toBeUndefined()
+  expect(await pane.find({ type: 'Text', text: '没有可看的截图' })).toBeDefined()
+  expect(await pane.find({ type: 'Text', text: /另有 3 张截图的文件已不在/ })).toBeDefined()
+  await pane.unmount()
 })

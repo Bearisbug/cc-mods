@@ -1,6 +1,6 @@
 {
   "name": "shot-view",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "收集 Claude 截下或查看的 PNG，ctrl+x s 在侧边面板里看图；看过的按 r 标为已读就不再出现（u 撤销），可翻页、用预览打开、在 Finder 显示、复制路径",
   "author": {
     "name": "Bearisbug"
