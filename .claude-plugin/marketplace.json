@@ -1,0 +1,10 @@
+{
+  "name": "cc-mods",
+  "owner": { "name": "Bearisbug" },
+  "description": "三个 Claude Code mod：截图面板、长任务进度、按目录精简 MCP 说明",
+  "plugins": [
+    { "name": "shot-view", "source": "./shot-view", "description": "收集 Claude 截下或查看的 PNG，ctrl+x s 在侧边面板里看图" },
+    { "name": "task-eta", "source": "./task-eta", "description": "长任务进度：步骤、进度格、剩余时间，ctrl+x p 展开步骤清单" },
+    { "name": "ctx-slim", "source": "./ctx-slim", "description": "按目录去掉用不上的 MCP 说明，省上下文" }
+  ]
+}

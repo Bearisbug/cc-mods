@@ -1,0 +1,8 @@
+{
+  "name": "task-eta",
+  "version": "0.5.1",
+  "description": "长任务进度行：一轮跑满 3 分钟时让模型估一次剩余步骤，之后按工具调用推进状态栏里的步骤、进度条和剩余时间",
+  "author": {
+    "name": "Bearisbug"
+  }
+}

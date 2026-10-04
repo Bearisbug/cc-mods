@@ -1,0 +1,9 @@
+{
+  "name": "ctx-slim",
+  "version": "0.2.1",
+  "description": "按目录去掉用不上的 MCP 说明：kando 只在路径含 kando 时保留，synco 只在有 Synco 块或路径含 synco 时保留，shadcn-io 只在有 package.json 时保留",
+  "author": {
+    "name": "Bearisbug"
+  },
+  "types": "./types/index.d.ts"
+}

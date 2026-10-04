@@ -1,0 +1,4 @@
+.DS_Store
+# Claude Code 加载本地插件目录时自动生成的类型与 tsconfig
+**/.claude-plugin/types/
+/*/tsconfig.json
