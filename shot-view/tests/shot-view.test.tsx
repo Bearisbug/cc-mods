@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'claude-code/testing'
+import { describe, expect, mock, test } from 'claude-code/testing'
 
 import { findPngPaths, resolvePath } from '../hooks/register'
 
@@ -80,8 +80,11 @@ test('a screenshot taken by Bash shows in the pane, and the pane pages back', as
   expect(image?.props.source).toMatchObject({ file: '/w/shots/home.png', format: 'png' })
   expect(await ui.find({ text: '1/2' })).toBeDefined()
 
-  await ui.press({ key: 'prev' })
+  // 面板从最新一张开始，n 往后看更早的那张，p 回来
+  await ui.press({ key: 'next' })
   expect((await ui.find({ type: 'Image' }))?.props.source).toMatchObject({ file: '/w/shots/old.png', format: 'png' })
+  await ui.press({ key: 'prev' })
+  expect((await ui.find({ type: 'Image' }))?.props.source).toMatchObject({ file: '/w/shots/home.png', format: 'png' })
   await ui.unmount()
 
   const desktop = await $.ui.mount({ plugin: 'shot-view', surface: 'desktop', component: 'Pane', requestId: 'shots', props: PANE_PROPS })
@@ -116,8 +119,8 @@ test('r marks a shot read so it leaves the pane, u brings it back, an unchanged 
   expect(await image(pane)).toBe('/w/b.png')
 
   // 只是翻过不算已读
-  await pane.press({ key: 'prev' })
   await pane.press({ key: 'next' })
+  await pane.press({ key: 'prev' })
   expect(await pane.find({ type: 'Text', text: /未读 1\/2/ })).toBeDefined()
 
   await pane.press({ key: 'read' })
@@ -203,4 +206,66 @@ test('a deleted file leaves the pane instead of drawing a black box; an overwrit
   expect(await pane.find({ type: 'Text', text: '没有可看的截图' })).toBeDefined()
   expect(await pane.find({ type: 'Text', text: /另有 3 张截图的文件已不在/ })).toBeDefined()
   await pane.unmount()
+})
+
+describe('o: hold to enlarge in the terminal, tap for Quick Look', () => {
+  const setup = (on: Parameters<Extract<Parameters<typeof test>[1], (...args: never[]) => unknown>>[1]) => {
+    const clock = mock.clock(on, { now: 1_000_000 })
+    const runs: string[][] = []
+    const opens: { columns?: number }[] = []
+    on('env.get', () => ({ value: '/Users/x' }))
+    on('session.cwd', () => ({ value: '/w' }))
+    on('fs.stat', () => ({ value: { kind: 'file' as const, size: 10, mtimeMs: Date.now(), isLink: false } }))
+    on('process.run', ($, e) => {
+      runs.push([...e.argv])
+      return { value: { exitCode: 0, stdout: 'pixelWidth: 1280\n  pixelHeight: 860\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    })
+    on('ui.panes', () => ({ value: [] }))
+    on('ui.open', ($, e) => {
+      opens.push({ columns: e.columns })
+      return { value: { isPlaced: true as const } }
+    })
+    on('tool.call', () => ({ result: { stdout: '', stderr: '', interrupted: false }, text: '' }))
+    return { clock, runs, opens }
+  }
+  const props = { ...PANE_PROPS, bodyColumns: 50, scroll: { offset: 0, bodyRows: 30 } }
+  const viewport = { columns: 160, rows: 40, isFullscreen: true }
+
+  test('holding o (repeated presses) enlarges the picture; when the repeats stop it goes back', async ($, on) => {
+    const { clock, runs, opens } = setup(on)
+    await $.tool.call({ tool: 'Bash', command: 'screencapture /w/a.png' })
+    const pane = await $.ui.mount({ plugin: 'shot-view', surface: 'terminal', component: 'Pane', requestId: 'shots', props, viewport })
+    const opensBefore = opens.length
+    const normalRows = ((await pane.find({ type: 'Image' }))?.props.rows as number) ?? 0
+
+    await pane.press({ key: 'peek' })
+    await clock.advance(300)
+    await pane.press({ key: 'peek' })
+    for (let i = 0; i < 6; i++) {
+      await clock.advance(60)
+      await pane.press({ key: 'peek' })
+    }
+    expect(await pane.find({ key: 'peek', text: /松开 o 回到列表/ })).toBeDefined()
+    expect(((await pane.find({ type: 'Image' }))?.props.rows as number) ?? 0).toBeGreaterThan(normalRows)
+
+    await clock.advance(400)
+    expect(await pane.find({ key: 'peek', text: /松开 o 回到列表/ })).toBeUndefined()
+    expect(await pane.find({ key: 'next' })).toBeDefined()
+    expect(runs.some(r => r[0] === 'qlmanage')).toBe(false)
+    // 放大只在面板里做，不重新 open 面板、不改宽度
+    expect(opens.length).toBe(opensBefore)
+    await pane.unmount()
+  })
+
+  test('a single tap of o opens macOS Quick Look and leaves the pane as it was', async ($, on) => {
+    const { clock, runs } = setup(on)
+    await $.tool.call({ tool: 'Bash', command: 'screencapture /w/a.png' })
+    const pane = await $.ui.mount({ plugin: 'shot-view', surface: 'terminal', component: 'Pane', requestId: 'shots', props, viewport })
+    await pane.press({ key: 'peek' })
+    expect(runs.some(r => r[0] === 'qlmanage')).toBe(false)
+    await clock.advance(600)
+    expect(runs.find(r => r[0] === 'qlmanage')).toEqual(['qlmanage', '-p', '/w/a.png'])
+    expect(await pane.find({ key: 'peek', text: /松开 o 回到列表/ })).toBeUndefined()
+    await pane.unmount()
+  })
 })

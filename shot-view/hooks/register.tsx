@@ -1,5 +1,5 @@
 import { atom, read, update } from 'claude-code'
-import type { EngineInterface, Register } from 'claude-code'
+import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import type { Shot } from '../types'
 
@@ -14,6 +14,15 @@ const index = atom({ plugin: 'shot-view', key: 'index' } as const, 0)
 
 // 状态条带里的提示：最新一张未读截图的文件名，打开面板后清掉
 let hint: string | null = null
+
+// 按住 o：在终端里放大看，松开就收起；轻按 o：打开 macOS 快速查看。
+// 插件收不到「松开」事件，只能靠按住时终端不断补发的重复按键来判断：
+// HOLD_MS 内来了第二下就算按住，之后 RELEASE_MS 没再来就算松开；HOLD_MS 内没有第二下就算轻按
+const HOLD_MS = 500
+const RELEASE_MS = 220
+type Press = { path: string; lastAt: number; isHeld: boolean; timer: Timer | null }
+let press: Press | null = null
+let isPeeking = false
 
 // 只有按 r 才算已读：翻过、看过都不算
 function unreadOf(list: Shot[]): Shot[] {
@@ -93,6 +102,54 @@ async function record($: Api, candidates: string[], via: string, isRecentOnly: b
     hint = basename(newest.path)
     $.ui.invalidate('ui.render')
   }
+}
+
+// 放大只在当前面板里做（藏起标题、路径和按键，让图铺满）。不去改面板宽度：
+// 停靠面板的宽度由 Claude Code 管，重新 open 带 columns 时宽度不升反降，还可能被记住
+function setPeeking($: Api, on: boolean) {
+  isPeeking = on
+  $.ui.invalidate('ui.render')
+}
+
+async function watchRelease($: Api, p: Press) {
+  if (press !== p) return
+  if ((await $.clock.now()) - p.lastAt < RELEASE_MS) return
+  p.timer?.cancel()
+  press = null
+  setPeeking($, false)
+}
+
+export async function pressPeek($: Api, path: string) {
+  const now = await $.clock.now()
+  const p = press
+  if (!p || p.path !== path) {
+    p?.timer?.cancel()
+    const fresh: Press = { path, lastAt: now, isHeld: false, timer: null }
+    press = fresh
+    fresh.timer = $.clock.after(HOLD_MS, () => {
+      if (press !== fresh || fresh.isHeld) return
+      press = null
+      void $.process.run(['qlmanage', '-p', path], { timeoutMs: 600_000 }).catch(() => undefined)
+    })
+    return
+  }
+  p.lastAt = now
+  if (p.isHeld) return
+  p.isHeld = true
+  p.timer?.cancel()
+  p.timer = $.clock.every(60, () => void watchRelease($, p))
+  setPeeking($, true)
+}
+
+// 按面板能用的格子数缩图，保持宽高比（终端一格约是一宽两高）
+function fit(shot: Shot, maxColumns: number, maxRows: number): { columns: number; rows: number } {
+  let columns = maxColumns
+  let rows = Math.round((columns * shot.height) / shot.width / 2)
+  if (rows > maxRows) {
+    rows = maxRows
+    columns = Math.max(4, Math.round((rows * 2 * shot.width) / shot.height))
+  }
+  return { columns, rows: Math.min(255, rows) }
 }
 
 async function markRead($: Api, path: string) {
@@ -207,18 +264,9 @@ export const register: Register = on => {
       )
     }
 
-    // 按面板真正能显示的高度缩图：标题、路径、两排按键和两行说明约占 8 行，图片太高会把按键挤出去
-    const maxColumns = Math.max(10, e.props.bodyColumns - 2)
     const visibleRows = Math.min(e.props.scroll.bodyRows, e.viewport?.rows ?? e.props.scroll.bodyRows)
-    const maxRows = Math.max(4, visibleRows - 8 - (gone > 0 ? 1 : 0))
-    let columns = maxColumns
-    let rows = Math.round((columns * shot.height) / shot.width / 2)
-    if (rows > maxRows) {
-      rows = maxRows
-      columns = Math.max(4, Math.round((rows * 2 * shot.width) / shot.height))
-    }
-    const alt = `${basename(shot.path)}（终端没有开启图片显示，按 o 用预览打开）`
-    const picture =
+    const alt = `${basename(shot.path)}（终端没有开启图片显示，轻按 o 用快速查看打开）`
+    const pictureOf = (size: { columns: number; rows: number }) =>
       e.surface === 'terminal' ? (
         (() => {
           const { Image } = $.ui.resolve(e)
@@ -226,8 +274,8 @@ export const register: Register = on => {
             <Image
               key="shot"
               source={{ file: shot.path, format: 'png', generation: live.get(shot.path) ?? 0 }}
-              columns={columns}
-              rows={Math.min(255, rows)}
+              columns={size.columns}
+              rows={size.rows}
               alt={alt}
             />
           )
@@ -235,6 +283,22 @@ export const register: Register = on => {
       ) : (
         <Text dimColor>{alt}</Text>
       )
+
+    // 按住 o 的放大视图：只留图和一行提示，图铺满面板。
+    // 提示行本身就是绑着 o 的按键：按住时终端补发的重复按键要有地方接，否则会被当成已经松开
+    if (isPeeking) {
+      return (
+        <Box flexDirection="column">
+          {pictureOf(fit(shot, Math.max(10, e.props.bodyColumns), Math.max(4, visibleRows - 1)))}
+          <Button key="peek" plain hotkey="o" dimColor onPress={() => void pressPeek($, shot.path)}>
+            {`放大查看 ${basename(shot.path)} · 松开 o 回到列表`}
+          </Button>
+        </Box>
+      )
+    }
+
+    // 普通视图按面板真正能显示的高度缩图：标题、路径、两排按键和两行说明约占 8 行，图片太高会把按键挤出去
+    const picture = pictureOf(fit(shot, Math.max(10, e.props.bodyColumns - 2), Math.max(4, visibleRows - 8 - (gone > 0 ? 1 : 0))))
 
     return (
       <Box flexDirection="column" paddingX={1}>
@@ -254,11 +318,11 @@ export const register: Register = on => {
         {goneNote}
         {picture}
         <Box flexDirection="row" gap={2}>
-          <Button key="prev" plain hotkey="p" onPress={() => void update($, index, n => Math.min(n + 1, unread.length - 1))}>
-            上一张
-          </Button>
-          <Button key="next" plain hotkey="n" onPress={() => void update($, index, n => Math.max(n - 1, 0))}>
+          <Button key="next" plain hotkey="n" onPress={() => void update($, index, n => Math.min(n + 1, unread.length - 1))}>
             下一张
+          </Button>
+          <Button key="prev" plain hotkey="p" onPress={() => void update($, index, n => Math.max(n - 1, 0))}>
+            上一张
           </Button>
           <Button key="read" plain hotkey="r" onPress={() => void markRead($, shot.path)}>
             标为已读
@@ -266,8 +330,8 @@ export const register: Register = on => {
           {readCount > 0 && undo}
         </Box>
         <Box flexDirection="row" gap={2}>
-          <Button key="open" plain hotkey="o" onPress={() => void $.process.run(['open', shot.path])}>
-            预览打开
+          <Button key="peek" plain hotkey="o" onPress={() => void pressPeek($, shot.path)}>
+            按住放大 · 轻按快速查看
           </Button>
           <Button key="reveal" plain hotkey="f" onPress={() => void $.process.run(['open', '-R', shot.path])}>
             Finder
@@ -276,7 +340,7 @@ export const register: Register = on => {
             复制路径
           </Button>
         </Box>
-        <Text dimColor>看过、不需要再看了就按 r，它不会再出现；只是翻过不算已读</Text>
+        <Text dimColor>从最新一张开始，n 往后看更早的；看过、不需要再看了就按 r，它不会再出现，只是翻过不算已读</Text>
         {closeHint}
       </Box>
     )
