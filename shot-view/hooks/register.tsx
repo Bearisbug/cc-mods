@@ -12,8 +12,14 @@ const shots = atom({ plugin: 'shot-view', key: 'shots' } as const, [])
 // 在「未读」列表里的位置，0 是最新一张
 const index = atom({ plugin: 'shot-view', key: 'index' } as const, 0)
 
-// 状态条带里的提示：最新一张未读截图的文件名，打开面板后清掉
+// 状态条带里的提示：最新一张未读截图的路径，打开面板后清掉
 let hint: string | null = null
+
+// 截图文件在会话外被删、被移走或被覆盖时，Claude Code 不会因此重画。
+// 条带有提示或面板开着时每 WATCH_MS 查一次文件，和上次画出来的不一样就重画
+const WATCH_MS = 2000
+let watching: Timer | null = null
+let drawn = ''
 
 // 按住 o：在终端里放大看，松开就收起；轻按 o：打开 macOS 快速查看。
 // 插件收不到「松开」事件，只能靠按住时终端不断补发的重复按键来判断：
@@ -40,6 +46,28 @@ async function present($: Api, list: Shot[]): Promise<Map<string, number>> {
     }),
   )
   return out
+}
+
+function keyOf(live: Map<string, number>): string {
+  return [...live]
+    .map(([path, mtime]) => `${path}@${mtime}`)
+    .sort()
+    .join('\n')
+}
+
+function watchFiles($: Api) {
+  if (watching) return
+  watching = $.clock.every(WATCH_MS, () => void recheck($))
+}
+
+async function recheck($: Api) {
+  const isOpen = (await $.ui.panes()).some(p => p.id === PANE)
+  if (!hint && !isOpen) {
+    watching?.cancel()
+    watching = null
+    return
+  }
+  if (keyOf(await present($, unreadOf(await read($, shots)))) !== drawn) $.ui.invalidate('ui.render')
 }
 
 export function findPngPaths(text: string): string[] {
@@ -99,8 +127,9 @@ async function record($: Api, candidates: string[], via: string, isRecentOnly: b
   await update($, index, () => 0)
   const isOpen = (await $.ui.panes()).some(p => p.id === PANE)
   if (!isOpen) {
-    hint = basename(newest.path)
+    hint = newest.path
     $.ui.invalidate('ui.render')
+    watchFiles($)
   }
 }
 
@@ -189,6 +218,7 @@ export const register: Register = on => {
     hint = null
     $.ui.invalidate('ui.render')
     await $.ui.open({ id: PANE, title: '截图', focus: true, closeOnEscape: true, rows: 30 })
+    watchFiles($)
     return {}
   })
 
@@ -207,9 +237,13 @@ export const register: Register = on => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const below = await next(e)
+    if (!hint) return below
+    const unread = unreadOf(await read($, shots))
+    const live = await present($, unread)
+    drawn = keyOf(live)
+    // 提示的那张不在了就换成还在的最新一张；一张都不在了就不再提示
+    if (!live.has(hint)) hint = unread.find(s => live.has(s.path))?.path ?? null
     if (!hint || e.props.hasSurvey) return below
-    const unread = (await present($, unreadOf(await read($, shots)))).size
-    if (unread === 0) return below
     const { Box, Text } = $.ui.resolve(e)
     return (
       <Box flexDirection="column">
@@ -217,8 +251,8 @@ export const register: Register = on => {
           <Text color="ide" bold>
             ▍截图
           </Text>
-          <Text>新增 {hint}</Text>
-          <Text dimColor>未读 {unread} 张 · ctrl+x s 查看</Text>
+          <Text>新增 {basename(hint)}</Text>
+          <Text dimColor>未读 {live.size} 张 · ctrl+x s 查看</Text>
         </Box>
         {below}
       </Box>
@@ -230,6 +264,7 @@ export const register: Register = on => {
     const list = await read($, shots)
     const unreadAll = unreadOf(list)
     const live = await present($, unreadAll)
+    drawn = keyOf(live)
     const unread = unreadAll.filter(s => live.has(s.path))
     const gone = unreadAll.length - unread.length
     const readCount = list.length - unreadAll.length

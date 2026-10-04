@@ -269,3 +269,49 @@ describe('o: hold to enlarge in the terminal, tap for Quick Look', () => {
     await pane.unmount()
   })
 })
+
+test('files deleted outside the session update the band on their own, and the check stops once nothing is left', async ($, on) => {
+  const clock = mock.clock(on)
+  const base = Date.now()
+  const files: Record<string, number | undefined> = { '/w/a.png': base, '/w/b.png': base }
+  let stats = 0
+  on('env.get', () => ({ value: '/Users/x' }))
+  on('session.cwd', () => ({ value: '/w' }))
+  on('fs.stat', ($, e) => {
+    stats++
+    const mtimeMs = files[e.path]
+    return mtimeMs === undefined
+      ? { deny: `ENOENT: ${e.path}` }
+      : { value: { kind: 'file' as const, size: 10, mtimeMs, isLink: false } }
+  })
+  on('process.run', () => ({
+    value: { exitCode: 0, stdout: 'pixelWidth: 1280\n  pixelHeight: 860\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false },
+  }))
+  on('ui.panes', () => ({ value: [] }))
+  on('ui.render', { component: 'AbovePrompt' }, ($, e) => {
+    const { Box } = $.ui.resolve(e)
+    return <Box />
+  })
+  on('tool.call', () => ({ result: { stdout: '', stderr: '', interrupted: false }, text: '' }))
+  await $.tool.call({ tool: 'Bash', command: 'screencapture a.png' })
+  await $.tool.call({ tool: 'Bash', command: 'screencapture b.png' })
+  const band = await $.ui.mount({ plugin: 'shot-view', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
+  expect(await band.find({ type: 'Text', text: '新增 b.png' })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: '未读 2 张 · ctrl+x s 查看' })).toBeDefined()
+
+  // 提示的那张被删：换成还在的那张，张数跟着变
+  files['/w/b.png'] = undefined
+  await clock.advance(2_000)
+  expect(await band.find({ type: 'Text', text: '新增 a.png' })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: '未读 1 张 · ctrl+x s 查看' })).toBeDefined()
+
+  // 全删了：条带不再提示，之后也不再去查文件
+  files['/w/a.png'] = undefined
+  await clock.advance(2_000)
+  expect(await band.find({ type: 'Text', text: /新增/ })).toBeUndefined()
+  await clock.advance(2_000)
+  const settled = stats
+  await clock.advance(20_000)
+  expect(stats).toBe(settled)
+  await band.unmount()
+})

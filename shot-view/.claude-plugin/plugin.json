@@ -1,6 +1,6 @@
 {
   "name": "shot-view",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "收集 Claude 截下或查看的 PNG，ctrl+x s 在侧边面板里看图；n/p 翻页，按住 o 在终端里放大、松开收起，轻按 o 用快速查看打开；看过的按 r 标为已读就不再出现（u 撤销）",
   "author": {
     "name": "Bearisbug"
