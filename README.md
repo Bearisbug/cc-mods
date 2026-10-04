@@ -4,13 +4,13 @@
 
 ![三个 mod 同时出现在输入框上方](docs/band.png)
 
-36 秒介绍视频（点图下载 mp4，6.9 MB）：
+77 秒介绍视频（点图下载 mp4，13.5 MB）：
 
-[![cc-mods 介绍视频](docs/video-poster.jpg)](brand/promo/intro-36s/renders/cc-mods-intro.mp4)
+[![cc-mods 介绍视频](docs/video-poster.jpg)](brand/promo/intro/renders/cc-mods-intro.mp4)
 
 ## mod 是什么
 
-mod 是 Claude Code v2.1.287 引入的一种插件：插件里放一个 JavaScript / TypeScript 模块，注册一组事件处理函数，在 Claude Code 进程里运行。它能在输入框上方的条带和侧边面板里画界面、注册斜杠命令、在工具调用前后插一手，这些是 settings 里的 hook、skill 和 MCP 做不到的。v2.1.287 起默认开启。官方文档：<https://code.claude.com/docs/en/plugins/mods/overview>
+mod 是 Claude Code v2.1.287 引入的一种插件：插件里放一个 JavaScript / TypeScript 模块，注册一组事件处理函数，在 Claude Code 进程里运行。它能在输入框上方的条带和侧边面板里画界面、注册斜杠命令、在工具调用前后插一手；其中画界面只有 mod 能做，settings 里的 hook、skill 和 MCP 都不行。v2.1.287 起默认开启。官方文档：<https://code.claude.com/docs/en/plugins/mods/overview>
 
 ## 安装
 
@@ -115,9 +115,9 @@ claude plugin test shot-view          # 跑 tests/ 里的测试
 claude --plugin-dir ./shot-view       # 只在这一个会话里加载，存盘自动重载
 ```
 
-`brand/promo/intro-36s/` 是介绍视频的源码（HyperFrames 0.8.96 + GSAP），分镜在 `storyboard.md`，录屏数据在 `assets/term.js`。改了以后在该目录运行 `npm ci`，再 `npx hyperframes render . -o renders/cc-mods-intro.mp4 --strict` 重新出片。
+`brand/promo/intro/` 是介绍视频的源码（HyperFrames 0.8.96 + GSAP），分镜在 `storyboard.md`，录屏数据在 `assets/term.js`。配乐文件不在仓库里，先用 `bash tools/cut_music.sh <原曲>` 从原曲剪出 `assets/audio.wav`，再在该目录运行 `npm ci`、`npx hyperframes render . -o renders/cc-mods-intro.mp4 --strict` 重新出片。
 
-README 和视频里的终端画面来自真实会话的录屏数据；shot-view 面板里的图片区域是后期合成的，因为录屏用的终端模拟器不支持 kitty 图形协议。
+README 和视频里的终端画面来自真实会话的录屏数据；shot-view 面板里的图片区域是后期合成的，因为录屏用的终端模拟器不支持 kitty 图形协议。视频里的计数器 mod 是[官方文档](https://code.claude.com/docs/en/plugins/mods/overview)的示例，拦截 `rm -rf` 的是官方示例 [blast-radius](https://github.com/anthropics/claude-code-playground/tree/main/claude-code/mods/blast-radius)。配乐：《栖谷来信》（Letter from an old friend），制造木屋/陈越龙，版权归原作者，不在本仓库的 MIT 许可之内。
 
 ## 许可
 

@@ -2,7 +2,7 @@
   "name": "cc-mods-intro",
   "version": "1.0.0",
   "private": true,
-  "description": "cc-mods 36 秒介绍视频（HyperFrames 组合）",
+  "description": "cc-mods 介绍视频（HyperFrames 组合）",
   "license": "MIT",
   "dependencies": {
     "gsap": "3.15.0",

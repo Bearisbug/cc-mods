@@ -1,0 +1,552 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  /* fonts:jetbrains-mono */
+  @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 700; font-display: block; src: url("fonts/jetbrains-mono-400-700-1.woff2") format("woff2"); unicode-range: U+21-7e, U+b7, U+d7, U+2013, U+2026, U+2190, U+2193, U+2212, U+23bf, U+23f8, U+23fa, U+2460-2462, U+2500, U+2502, U+2514, U+256d, U+256f-2570, U+2580, U+2588, U+258d, U+2590, U+259b-259d, U+25b0-25b1, U+25b6, U+25be, U+25cb, U+26a0, U+2713-2715, U+2722, U+2733, U+2736, U+273b, U+273d, U+276f; }
+  /* /fonts:jetbrains-mono */
+  /* fonts:noto-sans-sc */
+  @font-face { font-family: "Noto Sans SC"; font-style: normal; font-weight: 400 700; font-display: block; src: url("fonts/noto-sans-sc-400-700-1.woff2") format("woff2"); unicode-range: U+21-7e, U+b7, U+d7, U+2013, U+2026, U+2190, U+2193, U+2212, U+23bf, U+23f8, U+23fa, U+2460-2462, U+2500, U+2502, U+2514, U+256d, U+256f-2570, U+2580, U+2588, U+258d, U+2590, U+259b-259d, U+25b0-25b1, U+25b6, U+25be, U+25cb, U+26a0, U+2713-2715, U+2722, U+2733, U+2736, U+273b, U+273d, U+276f, U+3001-3002, U+300c-300d, U+4e00, U+4e09-4e0b, U+4e0d-4e0e, U+4e1c, U+4e24-4e25, U+4e2a, U+4e2d, U+4e3a-4e3b, U+4e48-4e49, U+4e4b, U+4e50, U+4e5f, U+4e86, U+4e8b, U+4ea4, U+4ec0, U+4ece, U+4ed3, U+4ee3-4ee5, U+4ef6, U+4efb, U+4efd, U+4f0f, U+4f1a, U+4f30, U+4f4f, U+4f53, U+4f59, U+4f60, U+4f8b, U+4f9d, U+4fa7, U+505a, U+505c, U+5143, U+5148, U+5165, U+5168, U+5171, U+5173, U+5177, U+5199, U+51fa, U+51fd, U+5206-5207, U+5217, U+5219-521a, U+521d, U+5220, U+5230, U+5236, U+524d, U+5269-526a, U+52a0-52a1, U+52a8, U+52fe, U+5305, U+5355, U+5360, U+5371, U+538b, U+539f, U+53c8, U+53d1, U+53d6, U+53e0, U+53e3, U+53ea, U+53ef, U+53f3, U+53f7, U+540c-540e, U+5411, U+5417, U+544a, U+547d, U+548c, U+54ea, U+56db, U+56de, U+56fe, U+5708, U+5728, U+5730, U+573a, U+5740, U+5757, U+589e, U+5904, U+590d, U+5916, U+591a, U+5934, U+594f, U+597d, U+59cb, U+5b50, U+5b57, U+5b83, U+5b89, U+5b8c, U+5b98, U+5b9a, U+5b9e, U+5bbd, U+5bf9, U+5c31, U+5c3e, U+5c45, U+5c4f, U+5c55, U+5de5-5de6, U+5dee, U+5df2, U+5e26-5e27, U+5e38, U+5e3d, U+5e55, U+5e8f, U+5e93, U+5ea6, U+5f00, U+5f0f, U+5f20, U+5f26, U+5f3a, U+5f55, U+5f62, U+5f69, U+5f84, U+5f97, U+6001, U+606f, U+6210-6211, U+6216, U+622a, U+6240, U+624d, U+6253, U+6267, U+6269, U+627e, U+628a, U+62cd, U+62e6, U+6309, U+6362, U+636e, U+6389, U+6392, U+63a5, U+63d0, U+63d2, U+6536, U+6539, U+653e, U+6548, U+6570, U+6574, U+6587, U+65ad, U+65b0, U+65b9, U+65f6, U+660e, U+662f, U+666f, U+66f2, U+6700, U+6709, U+672b-672c, U+6743, U+675f, U+6761, U+6765, U+677f, U+679c, U+67e5, U+6807, U+6837-6838, U+683c, U+6846, U+6863, U+68c0, U+6b21, U+6b62-6b63, U+6b65, U+6bb5, U+6bcf, U+6bd4, U+6c99, U+6ca1, U+6d4b, U+6d88, U+6e05, U+6e21, U+6ed1, U+6f14, U+70b9, U+7136, U+7167, U+7247-7248, U+72b6, U+72ec, U+73b0, U+751f, U+7528, U+753b, U+754c, U+7565, U+7684, U+76ee, U+76f4, U+76f8, U+7701, U+770b, U+771f, U+773c, U+7740, U+77ac, U+77ee, U+7801, U+786e, U+793a, U+7981, U+79cd, U+79d2, U+7a0b, U+7a81, U+7a84, U+7a97, U+7aef, U+7b26, U+7b2c, U+7b49, U+7b80, U+7b97, U+7bb1, U+7cbe, U+7ea6, U+7ebf, U+7ec4, U+7ec8, U+7ed3, U+7ed9, U+7f13, U+7f16, U+7f29, U+80fd, U+81ea, U+8272, U+8282, U+843d, U+884c, U+8865, U+8868, U+88ab, U+88c1, U+88c5, U+897f, U+8981, U+89c1, U+89c4, U+89c8, U+89d2, U+89e3, U+8ba1, U+8ba4, U+8bbe, U+8bc9, U+8bd1, U+8bd5, U+8bf4, U+8bfb, U+8c03, U+8d56, U+8d77, U+8dd1, U+8ddd, U+8ddf, U+8def, U+8e2a, U+8eab, U+8f6c, U+8f93, U+8fc7, U+8fd0, U+8fd9, U+8fdb, U+8fde, U+9000, U+901f, U+90a3, U+90bb, U+90e8, U+90fd, U+914d, U+91ca, U+91cc-91cd, U+952e, U+955c, U+957f, U+95ed, U+95f4, U+9650, U+9669, U+968f, U+9700, U+9762, U+97f3, U+987a, U+9884, U+9aa4, U+9ad8, U+ff08-ff09, U+ff0c, U+ff1a-ff1b, U+ff1f; }
+  /* /fonts:noto-sans-sc */
+  :root {
+    /* CRAFT-006：配色、字体、字号只在这里定义 */
+    --stage: #0B0B0D;
+    --win: #161618;
+    --bar: #1B1B1E;
+    --edge: #2A2A2E;
+    --dot: #3A3A3F;
+    --text: #ECEAE6;
+    --muted: #8C8C91;
+    --term-fg: #E6E6E6;
+    --orange: #D77757;
+    --blue: #4782C8;
+    --purple: #AF87FF;
+    --green: #4EBA65;
+    --sans: "Noto Sans SC", sans-serif;
+    --mono: "JetBrains Mono", "Noto Sans SC", monospace;
+    --title: 112px;
+    --head: 84px;
+    --sub: 48px;
+    --caption: 48px;
+    --label: 44px;
+    --src: 36px;
+  }
+  html, body { margin: 0; background: var(--stage); }
+  #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--stage); font-family: var(--sans); color: var(--text);
+          font-variant-ligatures: none; }
+  .clip { position: absolute; inset: 0; }
+  .abs { position: absolute; }
+
+  /* 终端窗口 */
+  #win { left: 80px; top: 160px; width: 1760px; height: 740px; border-radius: 18px; overflow: hidden;
+         background: var(--win); box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px var(--edge); }
+  #win .bar { position: absolute; left: 0; top: 0; right: 0; height: 40px; background: var(--bar); border-bottom: 1px solid var(--edge);
+              display: flex; align-items: center; gap: 9px; padding: 0 16px; font: 500 18px var(--sans); color: var(--muted); }
+  #win .bar i { width: 13px; height: 13px; border-radius: 50%; background: var(--dot); display: block; }
+  #win .bar b { font-weight: 500; margin-left: 12px; }
+  #view { position: absolute; left: 0; top: 40px; width: 1760px; height: 700px; overflow: hidden; }
+  #cam { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .shot { position: absolute; top: 0; opacity: 0; }
+  .grid { font: 18px/18.5px var(--mono); color: var(--term-fg); white-space: pre; font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
+  .row { height: 18.5px; }
+  .row > span { display: inline-block; overflow: hidden; vertical-align: top; }
+  .row > .fit { text-align: center; }
+  .row > .fit i { font-style: normal; font-size: 0.6em; }
+  .shot img { position: absolute; object-fit: contain; }
+  #fade { right: 0; top: 0; width: 280px; height: 700px; opacity: 0; background: linear-gradient(90deg, transparent, var(--win) 85%); }
+  #shell { left: 48px; top: 40px; font: 400 var(--label) var(--mono); color: var(--term-fg); }
+  #shell .typed { display: inline-block; overflow: hidden; width: 0; vertical-align: top; }
+  #shell .cursor { display: inline-block; width: 0.6em; height: 1.05em; background: var(--term-fg); vertical-align: -0.15em; margin-left: 2px; }
+
+  /* 片名 */
+  #title { left: 0; right: 0; top: 150px; text-align: center; opacity: 0; }
+  #title h1 { margin: 0; font: 700 var(--title)/1.1 var(--mono); letter-spacing: -1px; color: var(--text); }
+  #title h1 em { font-style: normal; color: var(--orange); }
+  #title p { margin: 22px 0 0; font: 700 var(--sub)/1.3 var(--sans); color: var(--text); opacity: .86; }
+
+  /* 2.2 官方示例代码 */
+  #src { left: 120px; top: 100px; width: 1680px; box-sizing: border-box; padding: 26px 40px 30px; border-radius: 18px; opacity: 0;
+         background: var(--win); box-shadow: 0 0 0 1px var(--edge); }
+  #src .head { margin-bottom: 18px; font: 500 var(--label)/1.2 var(--sans); color: var(--muted); }
+  #src .code { position: relative; font: 400 var(--src)/46px var(--mono); color: var(--term-fg);
+               font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
+  #src .ln { height: 46px; white-space: pre; }
+  .kw { color: var(--muted); }
+  .str { color: var(--orange); }
+  .hl { position: absolute; left: -24px; width: 6px; border-radius: 3px; background: var(--orange); opacity: 0; }
+  .note { position: absolute; font: 700 var(--label)/1.3 var(--sans); color: var(--orange); white-space: nowrap; opacity: 0; }
+
+  /* 2.6 四种扩展 */
+  #vs { left: 95px; top: 250px; width: 1730px; display: flex; gap: 30px; }
+  .vs { position: relative; flex: 1; height: 440px; box-sizing: border-box; padding: 36px 30px; border-radius: 18px; opacity: 0;
+        background: var(--win); box-shadow: 0 0 0 1px var(--edge); }
+  .vs b { display: block; font: 700 var(--label) var(--mono); color: var(--text); }
+  .vs p { margin: 30px 0 0; font: 500 var(--label)/1.35 var(--sans); color: var(--text); opacity: .86; }
+  .vs span { position: absolute; left: 30px; bottom: 36px; font: 700 var(--label) var(--sans); opacity: 0; }
+  .vs .no { color: var(--muted); }
+  .vs .yes { color: var(--orange); }
+  .vs.mod b { color: var(--orange); }
+  .vs .ring { position: absolute; inset: 0; border-radius: 18px; box-shadow: 0 0 0 3px var(--orange); opacity: 0; }
+  #vsNote { left: 0; right: 0; top: 740px; text-align: center; font: 500 var(--label) var(--sans); color: var(--muted); opacity: 0; }
+
+  /* 过渡：三个 mod */
+  #lineup { left: 0; right: 0; top: 200px; display: flex; flex-direction: column; align-items: center; gap: 28px; }
+  #lineup h2 { margin: 0 0 20px; font: 700 var(--head)/1.2 var(--sans); color: var(--text); opacity: 0; }
+  .lu { width: 900px; box-sizing: border-box; padding: 22px 34px; border-radius: 16px; display: flex; align-items: center; gap: 22px; opacity: 0;
+        background: var(--win); box-shadow: 0 0 0 1px var(--edge); font: 700 var(--label) var(--sans); color: var(--text); }
+  .lu i { width: 12px; height: 46px; border-radius: 3px; display: block; }
+
+  /* 角标、键帽、字幕 */
+  .badge { left: 80px; top: 100px; height: 50px; display: flex; align-items: center; gap: 14px; opacity: 0;
+           font: 700 var(--label) var(--mono); color: var(--text); }
+  .badge.zh { font-family: var(--sans); }
+  .badge i { width: 14px; height: 40px; border-radius: 3px; display: block; }
+  .keys { left: 0; right: 0; top: 908px; display: flex; justify-content: center; gap: 16px; opacity: 0; }
+  .key { min-width: 64px; height: 70px; padding: 0 24px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+         background: var(--bar); box-shadow: 0 0 0 2px var(--edge), 0 6px 0 var(--edge); font: 700 var(--label) var(--mono); color: var(--text); }
+  .caption { left: 0; right: 0; top: 920px; text-align: center; opacity: 0; font: 700 var(--caption)/1.2 var(--sans); color: var(--text); }
+
+  /* 6 · ctx-slim：被省掉的 MCP 说明块 */
+  #chips { left: 160px; top: 660px; display: flex; gap: 28px; align-items: center; opacity: 0; padding: 26px 34px; border-radius: 18px;
+           background: var(--win); box-shadow: 0 0 0 1px var(--edge), 0 20px 50px rgba(0,0,0,.5); }
+  .chip { position: relative; padding: 16px 30px; border-radius: 14px; background: var(--bar); box-shadow: 0 0 0 2px var(--edge);
+          font: 400 var(--label) var(--mono); color: var(--muted); }
+  .chip s { position: absolute; left: 18px; right: 18px; top: 50%; height: 4px; background: var(--green); transform: scaleX(0); transform-origin: 0 50%; }
+  #saved { font: 700 64px var(--mono); color: var(--green); margin-left: 24px; }
+
+  /* 7 · 收尾 */
+  #outro { left: 0; right: 0; top: 0; bottom: 0; }
+  #mark { left: 0; right: 0; top: 190px; text-align: center; font: 700 150px var(--mono); color: var(--text); letter-spacing: -2px; opacity: 0; }
+  #trio { left: 240px; top: 430px; opacity: 0;
+          -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent); mask-image: linear-gradient(90deg, #000 78%, transparent); }
+  #trio .grid { font-size: 34px; line-height: 52px; }
+  #trio .row { height: 52px; }
+  #install { left: 0; right: 0; top: 660px; text-align: center; font: 400 var(--label) var(--mono); color: var(--term-fg); }
+  #install .typed { display: inline-block; overflow: hidden; width: 0; vertical-align: top; white-space: pre; }
+  #url { left: 0; right: 0; top: 780px; text-align: center; font: 500 var(--label) var(--sans); color: var(--muted); opacity: 0; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="77" data-fps="30" data-width="1920" data-height="1080">
+  <div id="scene" class="clip" data-start="0" data-duration="77" data-track-index="0">
+
+    <div id="title" class="abs">
+      <h1>Claude Code <em>mods</em></h1>
+      <p>Claude Code 2.1.287 新加的一种插件：能直接改界面和行为</p>
+    </div>
+
+    <div id="win" class="abs">
+      <div class="bar"><i></i><i></i><i></i><b>Claude Code</b></div>
+      <div id="view">
+        <div id="cam" data-layout-allow-overflow></div>
+        <div id="shell" class="abs">❯ <span class="typed">claude</span><span class="cursor"></span></div>
+        <div id="fade" class="abs"></div>
+      </div>
+    </div>
+
+    <div id="src" class="abs">
+      <div class="head">官方文档里的示例 · hooks/register.js</div>
+      <div class="code">
+        <div class="ln"><span class="kw">let</span> calls = 0</div>
+        <div class="ln"> </div>
+        <div class="ln"><span class="kw">export function</span> register(on) {</div>
+        <div class="ln b1">  on(<span class="str">'tool.call'</span>, <span class="kw">async</span> ($, e, next) =&gt; {</div>
+        <div class="ln b1">    calls += 1</div>
+        <div class="ln b1">    $.ui.invalidate(<span class="str">'ui.render'</span>)</div>
+        <div class="ln b1">    <span class="kw">return</span> next(e)</div>
+        <div class="ln b1">  })</div>
+        <div class="ln"> </div>
+        <div class="ln b2">  on(<span class="str">'ui.render'</span>, { component: <span class="str">'Spinner'</span> }, <span class="kw">async</span> ($, e, next) =&gt; {</div>
+        <div class="ln b2">    <span class="kw">return</span> next({ ...e, props: { ...e.props,</div>
+        <div class="ln b2">      suffix: <span class="str">' · tool calls: '</span> + calls + <span class="str">'…'</span> } })</div>
+        <div class="ln b2">  })</div>
+        <div class="ln">}</div>
+        <i id="hl1" class="hl" style="top:138px;height:230px"></i>
+        <i id="hl2" class="hl" style="top:414px;height:184px"></i>
+        <div id="note1" class="note" style="left:1000px;top:196px">① Claude 每要用一次工具：<br>次数 +1，工具照常运行</div>
+        <div id="note2" class="note" style="left:1150px;top:472px">② 画转圈那一行时：<br>在后面写上次数</div>
+      </div>
+    </div>
+
+    <div id="vs" class="abs">
+      <div class="vs"><b>settings hook</b><p>事件发生时，<br>跑一条命令</p><span class="no">✕ 画界面</span></div>
+      <div class="vs"><b>skill</b><p>给 Claude 读的<br>一段说明</p><span class="no">✕ 画界面</span></div>
+      <div class="vs"><b>MCP</b><p>外部程序，<br>给 Claude<br>一组工具</p><span class="no">✕ 画界面</span></div>
+      <div class="vs mod"><i class="ring"></i><b>mod</b><p>在 Claude Code<br>里面运行的函数</p><span class="yes">✓ 画界面</span></div>
+    </div>
+    <div id="vsNote" class="abs">据官方文档的对比表</div>
+
+    <div id="lineup" class="abs">
+      <h2>cc-mods 的三个 mod</h2>
+      <div class="lu"><i style="background:var(--blue)"></i>① shot-view · 截图面板</div>
+      <div class="lu"><i style="background:var(--purple)"></i>② task-eta · 长任务进度</div>
+      <div class="lu"><i style="background:var(--green)"></i>③ ctx-slim · 精简 MCP 说明</div>
+    </div>
+
+    <div id="bzPlain" class="badge zh abs"><i style="background:var(--muted)"></i>没装 mod</div>
+    <div id="bzTrio" class="badge zh abs"><i style="background:var(--orange)"></i>装了 3 个 mod</div>
+    <div id="bzCount" class="badge zh abs"><i style="background:var(--orange)"></i>装上这个示例</div>
+    <div id="bzBlast" class="badge zh abs"><i style="background:var(--orange)"></i>官方示例 blast-radius</div>
+    <div id="bzDiff" class="badge zh abs"><i style="background:var(--orange)"></i>Claude Code 自带</div>
+    <div id="badge1" class="badge abs"><i style="background:var(--blue)"></i>① shot-view</div>
+    <div id="badge2" class="badge abs"><i style="background:var(--purple)"></i>② task-eta</div>
+    <div id="badge3" class="badge abs"><i style="background:var(--green)"></i>③ ctx-slim</div>
+
+    <div id="keys" class="keys abs"><div class="key">ctrl+x</div><div class="key" id="key2">s</div></div>
+    <div id="enter" class="keys abs"><div class="key">Enter</div></div>
+
+    <div id="chips" class="abs">
+      <div class="chip">kando<s></s></div><div class="chip">shadcn-io<s></s></div><div class="chip">synco<s></s></div><span id="saved">−0 字符</span>
+    </div>
+
+    <div id="cap21" class="caption abs">输入框上方这三行彩色提示，都是 mod 画的</div>
+    <div id="cap22" class="caption abs">mod 是一段 JavaScript：Claude Code 用工具、画界面前，先调用它</div>
+    <div id="cap23" class="caption abs">转圈那一行后面，多了工具调用次数</div>
+    <div id="cap24" class="caption abs">也能把危险命令先拦下来：告诉你会删掉什么，你点了才执行</div>
+    <div id="cap25" class="caption abs">Claude Code 自带的 /diff 面板，本身就是一个 mod</div>
+    <div id="cap26" class="caption abs">四种扩展里，只有 mod 能在界面上画东西</div>
+    <div id="cap27" class="caption abs">mod 用你的权限运行，没有沙箱。装之前跑一下 validate，看它会做什么</div>
+    <div id="cap3" class="caption abs">截图不用切窗口：Claude 截的图自动收进来，ctrl+x s 随时看</div>
+    <div id="cap4" class="caption abs">长任务自动估出步骤和剩余时间，ctrl+x p 展开步骤清单</div>
+    <div id="cap5" class="caption abs">按你配的目录规则，用不上的 MCP 说明不进上下文</div>
+
+    <div id="outro" class="abs">
+      <div id="mark" class="abs">cc-mods</div>
+      <div id="trio" class="abs"></div>
+      <div id="install" class="abs"><span class="typed">claude plugin marketplace add Bearisbug/cc-mods</span></div>
+      <div id="url" class="abs">github.com/Bearisbug/cc-mods · MIT</div>
+    </div>
+  </div>
+  <audio id="audio" src="assets/audio.wav" data-start="0" data-duration="77" data-track-index="9"></audio>
+</div>
+<script src="./assets/term.js"></script>
+<script src="./node_modules/gsap/dist/gsap.min.js"></script>
+<script>
+  gsap.config({ force3D: false });
+
+  // 节奏与缓动（CRAFT-006）
+  // land：加速落下、到终点突然停住，停住那一帧就是补间结束帧，正好压在拍点上
+  const EASE = { in: 'power3.out', cam: 'power2.inOut', out: 'power2.in', land: 'power2.in' };
+  const DUR = { in: 0.4, cam: 0.6, land: 0.25, out: 0.25, swap: 0.15 };
+
+  // 事件时间是配乐里拍点上的起音时刻（秒）：在 tools/cut_music.sh 剪出的曲子上用 librosa 找拍点，再取拍点附近
+  // 5 毫秒包络上升 6 dB 的那一刻（找不到时放宽到 3 dB）。曲子速度有起伏，拍点不等距，所以逐个写死，取整到帧（CRAFT-005）
+  const FPS = 30;
+  const at = s => Math.round(s * FPS) / FPS;
+  const half = (a, b) => at((a + b) / 2);
+
+  // 终端格子：18px JetBrains Mono，一格 0.6em 宽
+  const CW = 10.8, CH = 18.5, PAD = 16, COLS = 160, ROWS = 46;
+  const VW = 1760, VH = 700;
+  const NAMED = { default: 'var(--term-fg)', fg: 'var(--term-fg)', bg: 'var(--win)' };
+  const color = c => (/^[0-9a-f]{6}$/i.test(c) ? '#' + c : NAMED[c] || 'var(--term-fg)');
+  const bgColor = c => (c === 'default' ? null : /^[0-9a-f]{6}$/i.test(c) ? '#' + c : NAMED[c] || null);
+  const T = window.TERM;
+
+  function rowText(row) { return row.map(s => s[0]).join(''); }
+  function rowOf(name, marker) { return T[name].rows.findIndex(r => rowText(r).includes(marker)); }
+
+  // JetBrains Mono 里没有、回退字体又比一格宽的符号：单独占一格，字形缩到 0.6em 居中
+  const NARROW_FIT = new Set([...'⎿⏸⏺▰▱○✓✢✳✶✻✽']);
+
+  // 一行按列裁剪成 span：同样式的窄字符连成一段，宽字符（中文）单独一段占 2 格
+  function rowHtml(row, c0, c1) {
+    let x = 0, out = '';
+    const emit = (part, cells, fg, bg, bold, fit) => {
+      const style = `width:${cells}ch;color:${color(fg)};` + (bgColor(bg) ? `background:${bgColor(bg)};` : '') + (bold ? 'font-weight:700;' : '');
+      const text = part.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      // 终端行高 18.5px 比中文排版框矮，相邻行的框会相交，字形本身不重叠
+      out += `<span data-layout-allow-overlap${fit ? ' class="fit"' : ''} style="${style}">${fit ? `<i>${text}</i>` : text}</span>`;
+    };
+    for (const [text, cells, fg, bg, bold] of row) {
+      if (cells === 2) {
+        if (x >= c0 && x + 2 <= c1) emit(text, 2, fg, bg, bold, false);
+        x += 2;
+        continue;
+      }
+      let run = '';
+      const flush = () => { if (run) emit(run, run.length, fg, bg, bold, false); run = ''; };
+      for (const ch of text) {
+        if (x >= c0 && x < c1) {
+          if (NARROW_FIT.has(ch)) { flush(); emit(ch, 1, fg, bg, bold, true); } else run += ch;
+        }
+        x += 1;
+      }
+      flush();
+    }
+    return out;
+  }
+
+  function grid(name, c0 = 0, c1 = COLS, r0 = 0, r1 = ROWS) {
+    const el = document.createElement('div');
+    el.className = 'grid';
+    el.innerHTML = T[name].rows.slice(r0, r1).map(r => `<div class="row">${rowHtml(r, c0, c1)}</div>`).join('');
+    return el;
+  }
+
+  function shot(name, c0 = 0, c1 = COLS) {
+    const el = document.createElement('div');
+    el.className = 'shot';
+    el.style.left = `${PAD + c0 * CW}px`;
+    el.appendChild(grid(name, c0, c1));
+    const img = T[name].img;
+    if (img && c0 <= img[1]) {
+      const pic = document.createElement('img');
+      pic.src = './assets/ipad-home.jpg';
+      Object.assign(pic.style, { top: `${img[0] * CH}px`, left: `${(img[1] - c0) * CW}px`, width: `${img[3] * CW}px`, height: `${img[2] * CH}px` });
+      el.appendChild(pic);
+    }
+    document.getElementById('cam').appendChild(el);
+    return el;
+  }
+
+  // 镜头：把第 r0–r1 行、第 c0–c1 列放进取景框
+  function fit(r0, r1, c0, c1, left = false) {
+    const scale = Math.min(VW / ((c1 - c0) * CW), VH / ((r1 - r0) * CH));
+    const x = (left ? 40 : (VW - (c1 - c0) * CW * scale) / 2) - (PAD + c0 * CW) * scale;
+    const y = (VH - (r1 - r0) * CH * scale) / 2 - r0 * CH * scale;
+    return { x, y, scale };
+  }
+  const WIDE = fit(0, ROWS, 0, COLS);
+
+  // 每个画面里要强调的那一行（实录数据里找）
+  const R = {
+    blue: rowOf('shotBand', '▍截图'),
+    eta2: rowOf('eta2', '▍进度'),
+    green: rowOf('slim', '▍精简'),
+    done: rowOf('stepsDone', '▍进度'),
+    spin: rowOf('count1', 'tool calls'),
+  };
+
+  // 实录画面
+  const boot = shot('boot');
+  const plain = shot('plain'), trioShot = shot('trio');
+  const counts = ['count0', 'count1', 'count2', 'count3'].map(n => shot(n));
+  const blastAsk = shot('blastAsk'), blastDone = shot('blastDone');
+  const blastL = shot('blastPane', 0, 88), blastR = shot('blastPane', 88);
+  const diffSent = shot('diffSent');
+  const diffL = shot('diffPane', 0, 88), diffR = shot('diffPane', 88);
+  const valTyped = shot('valTyped'), valDone = shot('valDone');
+  const valPass = valDone.querySelectorAll('.row')[rowOf('valDone', 'Validation passed')];
+  const shotBand = shot('shotBand');
+  const paneL = shot('shotPane', 0, 88), paneR = shot('shotPane', 88);
+  const eta2 = shot('eta2'), eta3 = shot('eta3');
+  const midL = shot('stepsMid', 0, 88), midR = shot('stepsMid', 88);
+  const doneL = shot('stepsDone', 0, 88), doneR = shot('stepsDone', 88);
+  const slim = shot('slim');
+  const blueRow = shotBand.querySelectorAll('.row')[R.blue];
+  const greenRow = slim.querySelectorAll('.row')[R.green];
+
+  // 收尾的三行：取实录里三行同时出现的那一帧
+  const trioRows = ['▍截图', '▍进度', '▍精简'].map(m => rowOf('trio', m));
+  const trio = document.createElement('div');
+  trio.className = 'grid';
+  trio.innerHTML = trioRows.map(r => `<div class="row">${rowHtml(T.trio.rows[r], 0, 70)}</div>`).join('');
+  document.getElementById('trio').appendChild(trio);
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const cam = $('#cam'), win = $('#win'), fade = $('#fade');
+
+  // DET-006：初始状态在时间线外设定
+  gsap.set(win, { opacity: 0, y: 24 });
+  gsap.set(cam, WIDE);
+  gsap.set($('#title'), { y: -40 });
+  gsap.set($('#src'), { x: 120 });
+  gsap.set(['#note1', '#note2'], { x: 30 });
+  gsap.set($$('.vs'), { y: 40 });
+  gsap.set($$('.vs span'), { y: 20 });
+  gsap.set([$('#lineup h2'), ...$$('.lu')], { y: -30 });
+  gsap.set(['#mark', '#trio'], { y: -60 });
+  gsap.set([blueRow, greenRow, valPass], { opacity: 0 });
+  gsap.set([paneR, midR], { x: 780 });
+
+  const tl = gsap.timeline({ paused: true });
+  // 瞬切：在拍点那一帧就生效（DET-006 只禁止第 0 秒的 tl.set）
+  const show = (els, t) => tl.set(els, { opacity: 1 }, t);
+  const hide = (els, t) => tl.set(els, { opacity: 0 }, t);
+  const press = (el, t) => tl.to(el, { y: 6, duration: 0.06 }, t).to(el, { y: 0, duration: 0.12 }, t + 0.1);
+  const fadeIn = (els, t, d = 0.3) => tl.to(els, { opacity: 1, duration: d }, t);
+  const fadeOut = (els, t) => tl.to(els, { opacity: 0, duration: DUR.out, ease: EASE.out }, t);
+  const land = (els, t, from) => tl.fromTo(els, from, { opacity: 1, x: 0, y: 0, duration: DUR.land, ease: EASE.land, immediateRender: false }, t - DUR.land);
+  // 换场：画面在窗口不可见时换好，窗口从右侧滑入；退场时向左滑出
+  const winIn = (t, shots, view = WIDE) => {
+    show(shots, t - 0.02);
+    tl.set(cam, view, t - 0.02);
+    tl.set(win, { x: 220, y: 0, scale: 1 }, t - 0.02);
+    tl.to(win, { x: 0, opacity: 1, duration: DUR.in, ease: EASE.in }, t);
+  };
+  const winOut = (t, extra = []) => {
+    tl.to(win, { x: -220, opacity: 0, duration: DUR.out, ease: EASE.out }, t);
+    fadeOut(extra, t);
+  };
+
+  // 1 · 开场
+  tl.to(win, { opacity: 1, y: 0, duration: 0.5, ease: EASE.in }, 0);
+  tl.to($('#shell .typed'), { width: '6ch', duration: 0.75, ease: 'steps(6)' }, 0.3);
+  hide($('#shell'), at(1.305));
+  show(boot, at(1.305));
+  tl.set(cam, fit(0, 5, 0, 60), at(1.305));
+  tl.to(win, { y: 250, scale: 0.6, duration: 0.4, ease: EASE.in }, 1.45);
+  land($('#title'), at(2.2), { opacity: 0, y: -40 });
+  tl.to([$('#title'), win], { x: -220, opacity: 0, duration: DUR.out, ease: EASE.out }, 3.55);
+
+  // 2.1 · 装没装 mod，差在哪
+  hide(boot, at(3.805) - 0.02);
+  winIn(at(3.805), plain);
+  fadeIn($('#bzPlain'), at(3.805), 0.2);
+  tl.to(cam, { ...fit(32, 46, 0, 100, true), duration: DUR.cam, ease: EASE.cam }, at(4.67));
+  fadeIn(fade, at(4.67));
+  hide([plain, $('#bzPlain')], at(6.375));
+  show([trioShot, $('#bzTrio')], at(6.375));
+  fadeIn($('#cap21'), 6.9);
+  winOut(9.75, ['#bzTrio', '#cap21', fade]);
+
+  // 2.2 · mod 长什么样
+  hide(trioShot, 10.0);
+  tl.to($('#src'), { x: 0, opacity: 1, duration: DUR.in, ease: EASE.in }, at(9.99));
+  show($('#hl1'), at(10.91));
+  tl.set($$('#src .b2'), { opacity: 0.35 }, at(10.91));
+  land($('#note1'), at(10.91), { opacity: 0, x: 30 });
+  hide($('#hl1'), at(12.675));
+  show($('#hl2'), at(12.675));
+  tl.set($$('#src .b2'), { opacity: 1 }, at(12.675));
+  tl.set([...$$('#src .b1'), $('#note1')], { opacity: 0.35 }, at(12.675));
+  land($('#note2'), at(12.675), { opacity: 0, x: 30 });
+  fadeIn($('#cap22'), at(13.7));
+  tl.to(['#src', '#cap22'], { x: -220, opacity: 0, duration: DUR.out, ease: EASE.out }, 17.85);
+
+  // 2.3 · 装上以后
+  winIn(at(18.12), counts[0]);
+  fadeIn($('#bzCount'), at(18.12), 0.2);
+  tl.to(cam, { ...fit(R.spin - 3, R.spin + 4, 0, 80, true), duration: DUR.cam, ease: EASE.cam }, at(18.97));
+  fadeIn(fade, at(18.97));
+  [19.865, 20.745, 21.42].forEach((b, i) => { hide(counts[i], at(b)); show(counts[i + 1], at(b)); });
+  fadeIn($('#cap23'), 21.9);
+  winOut(23.95, ['#bzCount', '#cap23', fade]);
+
+  // 2.4 · 拦下危险命令
+  hide(counts[3], at(24.215) - 0.03);
+  winIn(at(24.215), blastAsk);
+  fadeIn($('#bzBlast'), at(24.215), 0.2);
+  // 面板弹出后镜头推近面板，左边的对话淡下去
+  hide(blastAsk, at(25.19));
+  show([blastL, blastR], at(25.19));
+  tl.to(cam, { ...fit(0, 18, 88, 160), duration: DUR.cam, ease: EASE.cam }, at(25.19));
+  tl.to(blastL, { opacity: 0, duration: DUR.cam }, at(25.19));
+  fadeIn($('#enter'), 26.4, 0.2);
+  press($('#enter .key'), at(27.22));
+  hide(blastR, at(27.22));
+  show(blastDone, at(27.22));
+  tl.set(cam, fit(5, 13, 0, 90, true), at(27.22));
+  fadeOut($('#enter'), 27.6);
+  fadeIn($('#cap24'), 27.9);
+  winOut(31.7, ['#bzBlast', '#cap24']);
+
+  // 2.5 · 自带的 /diff
+  hide(blastDone, at(31.97) - 0.03);
+  winIn(at(31.97), diffSent);
+  fadeIn($('#bzDiff'), at(31.97), 0.2);
+  hide(diffSent, at(32.895));
+  show([diffL, diffR], at(32.895));
+  tl.to(cam, { ...fit(0, 22, 88, 160), duration: DUR.cam, ease: EASE.cam }, at(32.895));
+  tl.to(diffL, { opacity: 0, duration: DUR.cam }, at(32.895));
+  fadeIn($('#cap25'), 33.5);
+  winOut(37.25, ['#bzDiff', '#cap25']);
+
+  // 2.6 · 和 hook、skill、MCP 比
+  $$('.vs').forEach((el, i) => tl.to(el, { y: 0, opacity: 1, duration: DUR.in, ease: EASE.in }, at(37.465) + i * 0.25));
+  land($$('.vs .no'), half(38.42, 39.305), { opacity: 0, y: 20 });
+  land($('.vs .yes'), at(39.305), { opacity: 0, y: 20 });
+  fadeIn($('.vs .ring'), at(39.305), 0.2);
+  fadeIn($('#vsNote'), 39.5);
+  fadeIn($('#cap26'), 39.8);
+  tl.to(['#vs', '#vsNote', '#cap26'], { x: -220, opacity: 0, duration: DUR.out, ease: EASE.out }, 42.8);
+
+  // 2.7 · 装之前先看一眼
+  hide(diffR, at(43.04) - 0.03);
+  winIn(at(43.04), valTyped, fit(0, 18, 0, 90, true));
+  fadeIn(fade, at(43.04));
+  hide(valTyped, at(43.995));
+  show(valDone, at(43.995));
+  show(valPass, at(44.865));
+  fadeIn($('#cap27'), 45.3);
+  winOut(48.1, ['#cap27', fade]);
+
+  // 3 · 过渡：三个 mod
+  land($('#lineup h2'), at(48.615), { opacity: 0, y: -30 });
+  $$('.lu').forEach((el, i) => land(el, at(48.615) + 0.25 * (i + 1), { opacity: 0, y: -30 }));
+  fadeOut(['#lineup h2', ...$$('.lu')], 50.3);
+
+  // 4 · shot-view
+  hide(valDone, at(50.58) - 0.03);
+  winIn(at(50.58), shotBand);
+  fadeIn($('#badge1'), at(50.58), 0.2);
+  show(blueRow, at(51.465));
+  tl.to(cam, { ...fit(R.blue - 1, R.blue + 2, 0, 66, true), duration: DUR.cam, ease: EASE.cam }, at(51.465));
+  fadeIn(fade, at(51.465));
+  tl.to(cam, { ...WIDE, duration: 0.3, ease: EASE.cam }, at(52.325));
+  tl.to(fade, { opacity: 0, duration: 0.2 }, at(52.325));
+  tl.set($('#key2'), { textContent: 's' }, at(52.325));
+  fadeIn($('#keys'), at(52.325), 0.2);
+  press($('#keys .key'), at(52.79));
+  press($('#key2'), at(52.985));
+  hide(shotBand, at(52.985));
+  show([paneL, paneR], at(52.985));
+  tl.to(paneR, { x: 0, duration: DUR.in, ease: EASE.in }, at(52.985));
+  tl.to($('#keys'), { opacity: 0, duration: 0.2 }, 53.75);
+  fadeIn($('#cap3'), 53.95);
+  fadeOut(['#cap3', '#badge1', paneL, paneR], 57.95);
+
+  // 5 · task-eta
+  tl.set(cam, WIDE, at(58.22) - 0.02);
+  tl.to(eta2, { opacity: 1, duration: DUR.swap }, at(58.22));
+  fadeIn($('#badge2'), at(58.22), 0.2);
+  tl.to(cam, { ...fit(R.eta2 - 1, R.eta2 + 2, 0, 66, true), duration: DUR.cam, ease: EASE.cam }, at(59.04));
+  fadeIn(fade, at(59.04));
+  hide(eta2, at(59.78));
+  show(eta3, at(59.78));
+  tl.to(cam, { ...WIDE, duration: 0.3, ease: EASE.cam }, at(60.63));
+  tl.to(fade, { opacity: 0, duration: 0.2 }, at(60.63));
+  tl.set($('#key2'), { textContent: 'p' }, at(60.63));
+  fadeIn($('#keys'), at(60.63), 0.2);
+  press($('#keys .key'), half(60.63, 61.66));
+  press($('#key2'), at(61.66));
+  hide(eta3, at(61.66));
+  show([midL, midR], at(61.66));
+  tl.to(midR, { x: 0, duration: DUR.in, ease: EASE.in }, at(61.66));
+  tl.to($('#keys'), { opacity: 0, duration: 0.2 }, half(61.66, 62.52));
+  tl.to(cam, { ...fit(0, 11, 89, 155), duration: DUR.cam, ease: EASE.cam }, half(61.66, 62.52));
+  fadeIn($('#cap4'), half(61.66, 62.52) + 0.2);
+  hide([midL, midR], at(63.445));
+  show([doneL, doneR], at(63.445));
+  tl.to(cam, { ...fit(R.done - 1, R.done + 2, 0, 66, true), duration: DUR.cam, ease: EASE.cam }, at(64.29));
+  fadeOut(['#cap4', '#badge2', doneL, doneR], 65.7);
+
+  // 6 · ctx-slim
+  tl.set(cam, WIDE, at(65.91) - 0.02);
+  tl.to(slim, { opacity: 1, duration: DUR.swap }, at(65.91));
+  fadeIn($('#badge3'), at(65.91), 0.2);
+  show(greenRow, at(66.78));
+  tl.to(cam, { ...fit(R.green - 1, R.green + 2, 0, 66, true), duration: DUR.cam, ease: EASE.cam }, at(66.78));
+  fadeIn($('#chips'), 67.2);
+  const strikes = [at(67.625), at(68.04), at(68.375)];
+  $$('.chip').forEach((el, i) => {
+    tl.to(el.querySelector('s'), { scaleX: 1, duration: 0.12 }, strikes[i] - 0.12);
+    tl.to(el, { opacity: 0.25, duration: 0.2 }, strikes[i]);
+  });
+  const saved = { n: 0 };
+  tl.to(saved, { n: 2172, duration: strikes[2] - strikes[0], ease: 'none', onUpdate: () => { $('#saved').textContent = `−${Math.round(saved.n)} 字符`; } }, strikes[0]);
+  fadeIn($('#cap5'), 68.6);
+  tl.to([win, '#badge3', '#chips', '#cap5'], { opacity: 0, duration: 0.4, ease: EASE.out }, 70.55);
+
+  // 7 · 收尾：字标与三行落在原曲的结尾和弦上，仓库地址落在最后一个音上
+  land(['#mark', '#trio'], at(71.205), { opacity: 0, y: -60 });
+  tl.to($('#install .typed'), { width: '47ch', duration: 1.5, ease: 'steps(47)' }, at(72.06));
+  fadeIn($('#url'), at(74.685));
+
+  window.__timelines["main"] = tl;
+</script>
+</body>
+</html>

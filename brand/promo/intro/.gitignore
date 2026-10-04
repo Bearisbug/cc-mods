@@ -1,0 +1,7 @@
+node_modules/
+.venv/
+snapshots/
+.hf-font-cache/
+
+# 配乐取自第三方曲目，不进仓库：用 tools/cut_music.sh 从原曲生成
+assets/audio.wav
