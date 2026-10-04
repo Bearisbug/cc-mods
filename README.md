@@ -4,7 +4,7 @@
 
 ![三个 mod 同时出现在输入框上方](docs/band.png)
 
-36 秒介绍视频（点图打开 mp4）：
+36 秒介绍视频（点图下载 mp4，6.9 MB）：
 
 [![cc-mods 介绍视频](docs/video-poster.jpg)](brand/promo/intro-36s/renders/cc-mods-intro.mp4)
 
