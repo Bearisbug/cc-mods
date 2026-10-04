@@ -1,9 +1,17 @@
 {
   "name": "ctx-slim",
-  "version": "0.2.1",
-  "description": "按目录去掉用不上的 MCP 说明：kando 只在路径含 kando 时保留，synco 只在有 Synco 块或路径含 synco 时保留，shadcn-io 只在有 package.json 时保留",
+  "version": "0.3.0",
+  "description": "按目录规则去掉用不上的 MCP 服务器说明，省上下文；规则在 userConfig 的 rules 里配置，没配规则时什么都不做",
   "author": {
     "name": "Bearisbug"
   },
-  "types": "./types/index.d.ts"
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "rules": {
+      "type": "string",
+      "title": "MCP 说明保留规则",
+      "description": "格式「服务器: 条件 | 条件; 服务器: 条件」。条件：path~子串（当前路径包含）、file=文件名（从当前目录往上能找到）、text=文字（CLAUDE.md 或 AGENTS.md 里有）。列出的服务器只在任一条件成立时保留说明，没列出的一律保留；留空则不做任何处理。例：kando: path~kando; shadcn-io: file=package.json",
+      "default": ""
+    }
+  }
 }

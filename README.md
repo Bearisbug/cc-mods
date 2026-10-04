@@ -60,9 +60,38 @@ claude plugin install ctx-slim@cc-mods
 
 ![ctx-slim 提示行](docs/ctx-slim.png)
 
-- 每接一个 MCP 服务器，它的使用说明都会跟着每一轮请求发给模型。ctx-slim 在 `prompt.attachment` 上拦下 MCP 说明，按当前目录去掉用不上的服务器那一节；工具本身照常可用。
+- 每接一个 MCP 服务器，它的使用说明都会跟着每一轮请求发给模型。ctx-slim 在 `prompt.attachment` 上拦下 MCP 说明，按你配的规则去掉当前目录用不上的服务器那一节；工具本身照常可用。
 - 每个会话第一次精简时，输入框上方出现一次绿色提示「▍精简 本目录省略了 … 的 MCP 说明 −N 字符」，30 秒后消失。
-- **规则是作者自己的**：kando 只在路径含 `kando` 时保留，synco 只在 CLAUDE.md / AGENTS.md 里有 Synco 的 project-context 块或路径含 `synco` 时保留，shadcn-io 只在当前目录往上有 `package.json` 时保留，其余服务器一律保留。装之前请把 [`ctx-slim/hooks/register.tsx`](ctx-slim/hooks/register.tsx) 里的 `rules()` 改成你自己的服务器名和条件，否则它不会有任何效果。
+- **默认什么都不做**，要先配规则。
+
+### 配置 ctx-slim
+
+规则可以在 `/config` 里的「MCP 说明保留规则」填一行，或者运行 `/plugin configure ctx-slim@cc-mods`，也可以直接写进 `~/.claude/settings.json`：
+
+```json
+{
+  "pluginConfigs": {
+    "ctx-slim@cc-mods": {
+      "options": {
+        "rules": "kando: path~kando; synco: text=<!-- synco:project-context:start | path~synco; shadcn-io: file=package.json"
+      }
+    }
+  }
+}
+```
+
+规则格式是 `服务器: 条件 | 条件; 服务器: 条件`，多条规则用分号或换行隔开：
+
+| 写法 | 含义 |
+|---|---|
+| 服务器名 | MCP 说明里 `## ` 后面的名字，不区分大小写 |
+| `path~子串` | 当前目录路径里包含这个子串，不区分大小写 |
+| `file=文件名` | 从当前目录往上能找到这个文件；当前目录在 HOME 下时只找到 HOME 为止 |
+| `text=文字` | 当前目录及上级目录的 CLAUDE.md 或 AGENTS.md 里含有这段文字 |
+
+列出的服务器只要有一个条件成立就保留它的说明，否则省略；没列出的服务器一律保留。条件里不能出现 `;` 和 `|`，写错的部分会被跳过，不会因此误删说明。
+
+上面那段示例是作者自己的规则：kando 的说明只在路径含 kando 时保留，synco 的说明在 CLAUDE.md 里有 Synco 的 project-context 标记、或路径含 synco 时保留，shadcn-io 的说明只在能找到 `package.json` 的前端项目里保留。
 
 ## 安全
 
@@ -72,7 +101,7 @@ mod 以你的用户权限在 Claude Code 进程里运行，不在沙箱里。装
 |---|---|---|
 | shot-view | `tool.call`、`command.run`、`ui.render` | `$.process.run`（只运行 `sips`、`open`）、`$.fs.stat`、`$.ui.*`、`$.state.*` |
 | task-eta | `turn.start`、`tool.call`、`turn.complete`、`command.run`、`ui.render` | `$.model.fork`、`$.clock.*`、`$.ui.*` |
-| ctx-slim | `prompt.attachment`、`ui.render` | `$.fs.exists`、`$.fs.ancestors`、`$.env.get`、`$.ui.*`、`$.state.*` |
+| ctx-slim | `prompt.attachment`、`ui.render`（没配规则时不注册任何钩子） | `$.fs.exists`、`$.fs.ancestors`、`$.env.get`、`$.ui.*`、`$.state.*` |
 
 ## 开发
 
