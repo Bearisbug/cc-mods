@@ -3,6 +3,7 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 import {
   applyCheck,
   checkPrompt,
+  planPrompt,
   describe as describeCall,
   duration,
   parseCheck,
@@ -125,17 +126,22 @@ const USAGE = { input_tokens: 0, output_tokens: 0, cache_creation_input_tokens: 
 // 让测试里的「Claude」按提问内容回答：估算给 PLAN_REPLY，核对给 replies.check
 function engine(
   on: Parameters<Parameters<typeof test>[1] extends infer B ? (B extends (...a: infer A) => unknown ? (...a: A) => unknown : never) : never>[1],
-  replies: { check: string; noReplyYet?: boolean },
+  replies: { check: string; noReplyYet?: boolean; slowCheck?: () => Promise<void>; prompts?: string[] },
 ) {
   const open = new Set<string>()
   on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('turn.complete', ($, e) => ({ text: e.answer }))
   on('tool.call', () => ({ result: { stdout: '', stderr: '', interrupted: false }, text: '' }))
-  on('model.fork', ($, e) => ({
-    value: replies.noReplyYet
-      ? { isAnswered: false as const, reason: 'nothing-to-fork' as const }
-      : { isAnswered: true as const, text: e.prompt.includes('核对') ? replies.check : PLAN_REPLY, usage: USAGE },
-  }))
+  on('model.fork', async ($, e) => {
+    replies.prompts?.push(e.prompt)
+    const isCheck = e.prompt.includes('核对')
+    if (isCheck && replies.slowCheck) await replies.slowCheck()
+    return {
+      value: replies.noReplyYet
+        ? { isAnswered: false as const, reason: 'nothing-to-fork' as const }
+        : { isAnswered: true as const, text: isCheck ? replies.check : PLAN_REPLY, usage: USAGE },
+    }
+  })
   on('ui.panes', () => ({ value: [...open].map(id => ({ id, title: id, isShown: true, isFocused: true, isPlaced: true })) }))
   on('ui.open', ($, e) => {
     open.add(e.id)
@@ -305,5 +311,45 @@ test('D: the progress line is one row of Texts, not a nested column', async ($, 
   const row = tree.children[0]
   expect(row?.props.flexDirection).toBe('row')
   expect(row?.children.map(c => c.type)).toEqual(['Text', 'Text', 'Text', 'Text'])
+  await band.unmount()
+})
+
+describe('E: estimates see what already ran, and generic commands are not keywords', () => {
+  test('planPrompt lists the calls already made and forbids generic command names', () => {
+    const prompt = planPrompt(['$ xcrun simctl io booted screenshot home.png', '$ sleep 70'])
+    expect(prompt).toContain('1. $ xcrun simctl io booted screenshot home.png')
+    expect(prompt).toContain('不要用 sleep、cd、ls')
+  })
+
+  test('parsePlan drops sleep / cd style signals but keeps specific ones', () => {
+    const text = '{"steps":[{"title":"等编译","signals":["sleep","sleep 50 # 编译","CD"],"minutes":1}]}'
+    expect(parsePlan(text)).toEqual([{ title: '等编译', signals: ['sleep 50 # 编译'], minutes: 1 }])
+  })
+
+  test('the estimate prompt carries this turn\'s calls', async ($, on) => {
+    const clock = mock.clock(on)
+    const prompts: string[] = []
+    engine(on, { check: '{"done":[],"current":1,"add":[]}', prompts })
+    await $.turn.start({ text: '截屏再编译', turnId: 't1' })
+    await $.tool.call({ tool: 'Bash', command: 'xcrun simctl io booted screenshot home.png' })
+    await $.command.run({ command: 'steps', ...RUN })
+    await clock.settle()
+    expect(prompts[0]).toContain('$ xcrun simctl io booted screenshot home.png')
+  })
+})
+
+test('F: between a normal end and the check finishing, the band says 正在核对 instead of 已暂停', async ($, on) => {
+  const clock = mock.clock(on)
+  engine(on, { check: '{"done":["1","2","3"],"current":3,"add":[]}', slowCheck: () => clock.sleep(10_000) })
+  const band = await $.ui.mount({ plugin: 'task-eta', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
+  await $.turn.start({ text: '跑测试再构建', turnId: 't1' })
+  await $.command.run({ command: 'steps', ...RUN })
+  await clock.settle()
+  await $.turn.complete({ answer: '好了', durationMs: 1000, isAborted: false, turnId: 't1', reason: 'answer' })
+  await clock.settle()
+  expect(await band.find({ type: 'Text', text: '正在核对…' })).toBeDefined()
+  expect(await band.find({ type: 'Text', text: '已暂停' })).toBeUndefined()
+  await clock.advance(10_000)
+  expect(await band.find({ type: 'Text', text: '任务完成' })).toBeDefined()
   await band.unmount()
 })

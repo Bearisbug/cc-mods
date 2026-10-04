@@ -28,6 +28,10 @@ type Task = {
   isBusy: boolean
   isAsked: boolean
   isWaitingFirstReply: boolean
+  // 正常收尾后等 Claude 核对的那几秒，显示「正在核对」而不是「已暂停」
+  isFinalChecking: boolean
+  // 这一轮执行过的工具调用（一行一条），估算时交给 Claude，免得把做完的步骤再列一遍
+  trail: string[]
   timer: Timer | null
 }
 type Check = { isSameTask: boolean; done: number[]; current: number; add: Step[] }
@@ -42,10 +46,20 @@ const MINUTE = 60_000
 const TOGGLE_KEY = 'ctrl+x p'
 const PANE = 'steps'
 
-const PLAN_PROMPT = `这是一个旁路问题：只回答，不要调用任何工具。
-对照用户最近一条消息交代的任务，和你到目前为止已经做过的工具调用，估计完成这个任务还剩哪些步骤（正在执行的那一步算第一步）。只输出一个 JSON 对象，不要任何别的文字：
+// 所有步骤都可能出现的通用命令名，当关键词用会让每条命令都把清单往前推一格
+const GENERIC_SIGNALS = new Set(['sleep', 'bash', 'sh', 'echo', 'cd', 'ls', 'cat', 'pwd', 'date', 'true', 'cp', 'mv', 'rm', 'mkdir', 'grep', 'find', 'sed', 'awk', 'git', 'npm', 'npx', 'node', 'python', 'python3', 'curl', 'read', 'edit', 'write'])
+
+export function planPrompt(trail: string[]): string {
+  const done = trail.length === 0 ? '（还没有执行任何工具调用）' : trail.map((c, i) => `${i + 1}. ${c}`).join('\n')
+  return `这是一个旁路问题：只回答，不要调用任何工具。
+这一轮到目前为止已经执行过的工具调用（按顺序）：
+${done}
+
+对照用户最近一条消息交代的任务和上面已经执行过的调用，估计完成这个任务还剩哪些步骤（正在执行的那一步算第一步；上面已经执行完的步骤不要再列）。只输出一个 JSON 对象，不要任何别的文字：
 {"steps":[{"title":"不超过 14 个字的步骤名","signals":["做这一步时会出现在命令、文件路径或工具名里的 1 到 3 个关键词"],"minutes":预计分钟数}]}
-minutes 按命令的真实耗时估，几十秒的步骤写 0.5 这样的小数。最多 8 步，按执行顺序；已经做完的步骤不要列。`
+关键词要能把这一步和别的步骤区分开：不要用 sleep、cd、ls、echo、cat、git、npm 这类每一步都可能出现的通用命令名。
+minutes 按命令的真实耗时估，几十秒的步骤写 0.5 这样的小数。最多 8 步，按执行顺序。`
+}
 
 let task: Task | null = null
 let bandUntil = 0
@@ -60,6 +74,7 @@ export function parseSteps(raw: unknown): Step[] {
       const signals = (Array.isArray(step.signals) ? step.signals : [])
         .filter((x): x is string => typeof x === 'string' && x.trim().length >= 2)
         .map(x => x.trim().toLowerCase())
+        .filter(x => !GENERIC_SIGNALS.has(x))
       return [{ title: step.title.trim().slice(0, 24), signals, minutes: Math.max(0.5, step.minutes) }]
     })
     .slice(0, 8)
@@ -190,6 +205,8 @@ function newTask(text: string): Task {
     isBusy: false,
     isAsked: false,
     isWaitingFirstReply: false,
+    isFinalChecking: false,
+    trail: [],
     timer: null,
   }
 }
@@ -255,8 +272,8 @@ async function ask($: Api, t: Task, prompt: string): Promise<string | null> {
 
 // 上一个模型调用还没回来时先等一等，而不是直接跳过（正常收尾的核对不能丢）
 function whenIdle($: Api, t: Task, run: () => void, tries = 20) {
-  if (task !== t || tries <= 0) return
-  if (t.isBusy) {
+  if (task !== t) return
+  if (t.isBusy && tries > 0) {
     $.clock.after(3000, () => whenIdle($, t, run, tries - 1))
     return
   }
@@ -265,7 +282,7 @@ function whenIdle($: Api, t: Task, run: () => void, tries = 20) {
 
 // 第一次：没有清单时估算一份
 async function estimate($: Api, t: Task) {
-  const text = await ask($, t, PLAN_PROMPT)
+  const text = await ask($, t, planPrompt(t.trail))
   const steps = text ? parsePlan(text) : []
   if (task === t && steps.length > 0 && t.items.length === 0) {
     const now = Date.now()
@@ -375,6 +392,7 @@ export const register: Register = on => {
       if (cur) cur.startedAt += now - prev.pausedAt
       prev.segmentStart = now
       prev.ending = 'running'
+      prev.isFinalChecking = false
       prev.timer = $.clock.every(TICK_MS, () => tick($))
       whenIdle($, prev, () => void check($, prev, { newText: e.text }))
     } else {
@@ -392,6 +410,7 @@ export const register: Register = on => {
       const now = Date.now()
       t.tools += 1
       t.activity = describe(e)
+      t.trail = [...t.trail, t.activity].slice(-30)
       const at = active(t)
       const cur = t.items[at]
       const nxt = t.items[at + 1]
@@ -427,8 +446,10 @@ export const register: Register = on => {
         if (!e.isAborted) {
           // 正常结束时核对一次，清单如实反映哪些做完了
           const answer = e.answer
+          t.isFinalChecking = true
           whenIdle($, t, () =>
             void check($, t, { answer }).then(() => {
+              t.isFinalChecking = false
               if (task === t && t.ending === 'paused' && isAllDone(t)) t.ending = 'done'
               redraw($)
             }),
@@ -454,8 +475,12 @@ export const register: Register = on => {
 
     let body
     if (!isRunning) {
-      const word = t.ending === 'done' ? '任务完成' : t.ending === 'aborted' ? '已中断' : '已暂停'
-      const tail = t.ending === 'done' ? `用时 ${spent(elapsed(t, now))}` : `完成 ${doneCount}/${t.items.length} 步 · 下一条消息接着这份清单`
+      const word = t.isFinalChecking ? '正在核对…' : t.ending === 'done' ? '任务完成' : t.ending === 'aborted' ? '已中断' : '已暂停'
+      const tail = t.isFinalChecking
+        ? `Claude 在确认哪些步骤真的做完了 · 已打勾 ${doneCount}/${t.items.length}`
+        : t.ending === 'done'
+          ? `用时 ${spent(elapsed(t, now))}`
+          : `完成 ${doneCount}/${t.items.length} 步 · 下一条消息接着这份清单`
       body = [
         <Text key="word">{word}</Text>,
         <Text key="tail" dimColor>
@@ -528,9 +553,9 @@ export const register: Register = on => {
       else parts.push(`${t.tools} 次工具调用`)
       if (t.isBusy && t.items.length > 0) parts.push('Claude 正在核对进度…')
     } else {
-      parts.unshift(t.ending === 'done' ? '任务完成' : t.ending === 'aborted' ? '已中断' : '已暂停')
+      parts.unshift(t.isFinalChecking ? '正在核对…' : t.ending === 'done' ? '任务完成' : t.ending === 'aborted' ? '已中断' : '已暂停')
       parts.push(`完成 ${doneCount}/${t.items.length} 步`)
-      if (t.ending !== 'done') parts.push('下一条消息接着这份清单')
+      if (t.ending !== 'done' && !t.isFinalChecking) parts.push('下一条消息接着这份清单')
     }
 
     const stepRow = (it: Item, n: number) => {
