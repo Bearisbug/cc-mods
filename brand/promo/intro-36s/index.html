@@ -1,0 +1,389 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  /* fonts:jetbrains-mono */
+  @font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400 700; font-display: block; src: url("fonts/jetbrains-mono-400-700-1.woff2") format("woff2"); unicode-range: U+21-7e, U+b7, U+d7, U+2013, U+2026, U+2193, U+2212, U+23bf, U+23f8, U+23fa, U+2460-2462, U+2500, U+2502, U+2514, U+2580, U+2588, U+258d, U+2590, U+259b-259d, U+25b0-25b1, U+25b6, U+25cb, U+2713, U+2715, U+2722, U+2733, U+2736, U+273b, U+273d, U+276f; }
+  /* /fonts:jetbrains-mono */
+  /* fonts:noto-sans-sc */
+  @font-face { font-family: "Noto Sans SC"; font-style: normal; font-weight: 400 700; font-display: block; src: url("fonts/noto-sans-sc-400-700-1.woff2") format("woff2"); unicode-range: U+b7, U+d7, U+2013, U+2026, U+2193, U+2212, U+23bf, U+23f8, U+23fa, U+2460-2462, U+2500, U+2502, U+2514, U+2580, U+2588, U+258d, U+2590, U+259b-259d, U+25b0-25b1, U+25b6, U+25cb, U+2713, U+2715, U+2722, U+2733, U+2736, U+273b, U+273d, U+276f, U+3001-3002, U+300c-300d, U+4e00, U+4e09-4e0b, U+4e0d-4e0e, U+4e25, U+4e2a, U+4e2d, U+4e3a-4e3b, U+4e48-4e49, U+4e5f, U+4e86, U+4ec0, U+4ee4, U+4ef6, U+4efb, U+4efd, U+4f1a, U+4f30, U+4f53, U+4f59, U+4f9d, U+5143, U+5168, U+5171, U+5173, U+5177, U+51fa, U+51fd, U+5206-5207, U+5217, U+521a, U+521d, U+5236, U+5269-526a, U+52a0-52a1, U+52a8, U+52fe, U+5305, U+5355, U+53d1, U+53d6, U+53e3, U+53ea, U+53f7, U+540c-540e, U+542f, U+547d, U+548c, U+56de, U+56fe, U+5728, U+573a, U+5757, U+589e, U+590d, U+5916, U+5934, U+594f, U+597d, U+59cb, U+5b50, U+5b57, U+5b89, U+5b8c, U+5b9a, U+5b9e, U+5bbd, U+5bf9, U+5c3e, U+5c4f, U+5c55, U+5de5, U+5df2, U+5e27, U+5e3d, U+5e55, U+5e8f, U+5ea6, U+5f00, U+5f20, U+5f3a, U+5f55, U+5f84, U+6001, U+606f, U+6210, U+6216, U+622a, U+624d, U+6253, U+6267, U+627e, U+628a, U+62e6, U+6309, U+636e, U+6389, U+63a5, U+63d0, U+63d2, U+6536, U+6539, U+653e, U+6570, U+6587, U+65ad, U+65b0, U+65f6, U+660e, U+662f, U+666f, U+672c, U+6761, U+6765, U+677f, U+679c, U+67e5, U+6807, U+6837-6838, U+683c, U+6846, U+68c0, U+6b21, U+6b63, U+6b65, U+6bb5, U+6bcf, U+6d4b, U+6d88, U+6e05, U+6f14, U+7247, U+72b6, U+72ec, U+73b0, U+7528, U+753b, U+754c, U+7565, U+7684, U+76ee, U+76f4, U+7701, U+770b, U+771f, U+7740, U+786e, U+793a, U+79d2, U+7a0b, U+7a84, U+7a97, U+7aef, U+7b26, U+7b2c, U+7b80, U+7b97, U+7cbe, U+7ea6, U+7ebf, U+7ec8, U+7ed3, U+7f13, U+7f16, U+81ea, U+8272, U+8282, U+884c, U+88ab, U+88c1, U+88c5, U+8981, U+89c8, U+89d2, U+89e3, U+8ba1, U+8ba4, U+8bbe, U+8bd1, U+8bd5, U+8bdd, U+8bf4, U+8c03, U+8d56, U+8d77, U+8dd1, U+8def, U+8fd9, U+8fdb, U+90a3, U+90e8, U+914d, U+91ca, U+91cc-91cd, U+94a9, U+952e, U+955c, U+957f, U+95ed, U+95f4, U+968f, U+9762, U+987a, U+9884, U+9aa4, U+9ed8, U+ff08-ff09, U+ff0c, U+ff1a-ff1b; }
+  /* /fonts:noto-sans-sc */
+  :root {
+    /* CRAFT-006：配色、字体、字号只在这里定义 */
+    --stage: #0B0B0D;
+    --win: #161618;
+    --bar: #1B1B1E;
+    --edge: #2A2A2E;
+    --dot: #3A3A3F;
+    --text: #ECEAE6;
+    --muted: #8C8C91;
+    --term-fg: #E6E6E6;
+    --orange: #D77757;
+    --blue: #4782C8;
+    --purple: #AF87FF;
+    --green: #4EBA65;
+    --sans: "Noto Sans SC", sans-serif;
+    --mono: "JetBrains Mono", "Noto Sans SC", monospace;
+    --title: 112px;
+    --sub: 48px;
+    --caption: 48px;
+    --label: 44px;
+    --code: 44px;
+  }
+  html, body { margin: 0; background: var(--stage); }
+  #root { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: var(--stage); font-family: var(--sans); color: var(--text);
+          font-variant-ligatures: none; }
+  .clip { position: absolute; inset: 0; }
+  .abs { position: absolute; }
+
+  /* 终端窗口 */
+  #win { left: 80px; top: 160px; width: 1760px; height: 740px; border-radius: 18px; overflow: hidden;
+         background: var(--win); box-shadow: 0 30px 80px rgba(0,0,0,.55), 0 0 0 1px var(--edge); }
+  #win .bar { position: absolute; left: 0; top: 0; right: 0; height: 40px; background: var(--bar); border-bottom: 1px solid var(--edge);
+              display: flex; align-items: center; gap: 9px; padding: 0 16px; font: 500 18px var(--sans); color: var(--muted); }
+  #win .bar i { width: 13px; height: 13px; border-radius: 50%; background: var(--dot); display: block; }
+  #win .bar b { font-weight: 500; margin-left: 12px; }
+  #view { position: absolute; left: 0; top: 40px; width: 1760px; height: 700px; overflow: hidden; }
+  #cam { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .shot { position: absolute; top: 0; opacity: 0; }
+  .grid { font: 18px/18.5px var(--mono); color: var(--term-fg); white-space: pre; font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
+  .row { height: 18.5px; }
+  .row > span { display: inline-block; overflow: hidden; vertical-align: top; }
+  .row > .fit { text-align: center; }
+  .row > .fit i { font-style: normal; font-size: 0.6em; }
+  .shot img { position: absolute; object-fit: contain; }
+  #fade { right: 0; top: 0; width: 280px; height: 700px; opacity: 0; background: linear-gradient(90deg, transparent, var(--win) 85%); }
+  #shell { left: 48px; top: 40px; font: 400 var(--code) var(--mono); color: var(--term-fg); }
+  #shell .typed { display: inline-block; overflow: hidden; width: 0; vertical-align: top; }
+  #shell .cursor { display: inline-block; width: 0.6em; height: 1.05em; background: var(--term-fg); vertical-align: -0.15em; margin-left: 2px; }
+
+  /* 片名 */
+  #title { left: 0; right: 0; top: 150px; text-align: center; opacity: 0; }
+  #title h1 { margin: 0; font: 700 var(--title)/1.1 var(--mono); letter-spacing: -1px; color: var(--text); }
+  #title h1 em { font-style: normal; color: var(--orange); }
+  #title p { margin: 22px 0 0; font: 700 var(--sub)/1.3 var(--sans); color: var(--text); opacity: .86; }
+
+  /* 第 2 场：一个 mod 的样子 */
+  .card { top: 250px; background: var(--win); border-radius: 18px; box-shadow: 0 0 0 1px var(--edge); padding: 34px 40px; opacity: 0;
+          font: 400 var(--code)/66px var(--mono); color: var(--text); white-space: pre;
+          font-variant-ligatures: none; font-feature-settings: "calt" 0, "liga" 0; }
+  #tree { left: 100px; width: 686px; }
+  #code { left: 900px; width: 840px; }
+  .card .head { color: var(--muted); }
+  .card .line { opacity: 0; }
+  .kw { color: var(--muted); }
+  .str { color: var(--orange); }
+  .tag { position: absolute; right: 36px; height: 58px; padding: 0 22px; border-radius: 29px; display: flex; align-items: center;
+         font: 700 var(--label) var(--sans); white-space: nowrap; opacity: 0; color: var(--stage); }
+  .tag.blue { background: var(--blue); } .tag.purple { background: var(--purple); } .tag.green { background: var(--green); }
+
+  /* 角标、键帽、字幕 */
+  .badge { left: 80px; top: 100px; height: 50px; display: flex; align-items: center; gap: 14px; opacity: 0;
+           font: 700 var(--label) var(--mono); color: var(--text); }
+  .badge i { width: 14px; height: 40px; border-radius: 3px; display: block; }
+  #keys { left: 0; right: 0; top: 908px; display: flex; justify-content: center; gap: 16px; opacity: 0; }
+  .key { min-width: 64px; height: 70px; padding: 0 24px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+         background: var(--bar); box-shadow: 0 0 0 2px var(--edge), 0 6px 0 var(--edge); font: 700 var(--label) var(--mono); color: var(--text); }
+  .caption { left: 0; right: 0; top: 920px; text-align: center; opacity: 0; font: 700 var(--caption)/1.2 var(--sans); color: var(--text); }
+
+  /* 第 5 场：被省掉的 MCP 说明块 */
+  #chips { left: 160px; top: 660px; display: flex; gap: 28px; align-items: center; opacity: 0; padding: 26px 34px; border-radius: 18px;
+           background: var(--win); box-shadow: 0 0 0 1px var(--edge), 0 20px 50px rgba(0,0,0,.5); }
+  .chip { position: relative; padding: 16px 30px; border-radius: 14px; background: var(--bar); box-shadow: 0 0 0 2px var(--edge);
+          font: 400 var(--label) var(--mono); color: var(--muted); }
+  .chip s { position: absolute; left: 18px; right: 18px; top: 50%; height: 4px; background: var(--green); transform: scaleX(0); transform-origin: 0 50%; }
+  #saved { font: 700 64px var(--mono); color: var(--green); margin-left: 24px; }
+
+  /* 第 6 场：收尾 */
+  #outro { left: 0; right: 0; top: 0; bottom: 0; }
+  #mark { left: 0; right: 0; top: 190px; text-align: center; font: 700 150px var(--mono); color: var(--text); letter-spacing: -2px; opacity: 0; }
+  #trio { left: 240px; top: 430px; opacity: 0;
+          -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent); mask-image: linear-gradient(90deg, #000 78%, transparent); }
+  #trio .grid { font-size: 34px; line-height: 52px; }
+  #trio .row { height: 52px; }
+  #install { left: 0; right: 0; top: 660px; text-align: center; font: 400 var(--label) var(--mono); color: var(--term-fg); }
+  #install .typed { display: inline-block; overflow: hidden; width: 0; vertical-align: top; white-space: pre; }
+  #url { left: 0; right: 0; top: 780px; text-align: center; font: 500 var(--label) var(--sans); color: var(--muted); opacity: 0; }
+</style>
+</head>
+<body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="36" data-fps="30" data-width="1920" data-height="1080">
+  <div id="scene" class="clip" data-start="0" data-duration="36" data-track-index="0">
+
+    <div id="title" class="abs">
+      <h1>Claude Code <em>mods</em></h1>
+      <p>插件里的函数钩子，直接改 Claude Code 的界面和行为</p>
+    </div>
+
+    <div id="win" class="abs">
+      <div class="bar"><i></i><i></i><i></i><b>Claude Code</b></div>
+      <div id="view">
+        <div id="cam" data-layout-allow-overflow></div>
+        <div id="shell" class="abs">❯ <span class="typed">claude</span><span class="cursor"></span></div>
+        <div id="fade" class="abs"></div>
+      </div>
+    </div>
+
+    <div id="tree" class="card abs"><span class="head">my-mod/</span>
+<span class="line">.claude-plugin/plugin.json</span>
+<span class="line">hooks/hooks.json</span>
+<span class="line">hooks/register.tsx</span></div>
+
+    <div id="code" class="card abs"><span class="line"><span class="kw">export const</span> register = on =&gt; {</span>
+<span class="line">  on(<span class="str">'tool.call'</span>, …)</span>
+<span class="line">  on(<span class="str">'ui.render'</span>, …)</span>
+<span class="line">  on(<span class="str">'command.run'</span>, …)</span>
+<span class="line">}</span><div class="tag blue" style="top:100px">拦工具调用</div><div class="tag purple" style="top:166px">画界面</div><div class="tag green" style="top:232px">加 / 命令</div></div>
+
+    <div id="badge1" class="badge abs"><i style="background:var(--blue)"></i>① shot-view</div>
+    <div id="badge2" class="badge abs"><i style="background:var(--purple)"></i>② task-eta</div>
+    <div id="badge3" class="badge abs"><i style="background:var(--green)"></i>③ ctx-slim</div>
+
+    <div id="keys" class="abs"><div class="key">ctrl+x</div><div class="key" id="key2">s</div></div>
+
+    <div id="chips" class="abs">
+      <div class="chip">kando<s></s></div><div class="chip">shadcn-io<s></s></div><div class="chip">synco<s></s></div><span id="saved">−0 字符</span>
+    </div>
+
+    <div id="cap2" class="caption abs">v2.1.287 起默认开启，跑在 Claude Code 进程里</div>
+    <div id="cap3" class="caption abs">截图不用切窗口：Claude 截的图自动收进来，ctrl+x s 随时看</div>
+    <div id="cap4" class="caption abs">长任务自动估出步骤和剩余时间，ctrl+x p 展开步骤清单</div>
+    <div id="cap5" class="caption abs">用不上的 MCP 说明不进上下文，每个会话只提示一次</div>
+
+    <div id="outro" class="abs">
+      <div id="mark" class="abs">cc-mods</div>
+      <div id="trio" class="abs"></div>
+      <div id="install" class="abs"><span class="typed">claude plugin marketplace add Bearisbug/cc-mods</span></div>
+      <div id="url" class="abs">github.com/Bearisbug/cc-mods · MIT</div>
+    </div>
+  </div>
+  <audio id="audio" src="assets/audio.wav" data-start="0" data-duration="36" data-track-index="9"></audio>
+</div>
+<script src="./assets/term.js"></script>
+<script src="./node_modules/gsap/dist/gsap.min.js"></script>
+<script>
+  gsap.config({ force3D: false });
+
+  // 节奏与缓动（CRAFT-006）
+  // land：加速落下、到终点突然停住，停住那一帧就是补间结束帧，便于和音效同帧
+  const EASE = { in: 'power3.out', cam: 'power2.inOut', pop: 'back.out(1.6)', out: 'power2.in', land: 'power2.in' };
+  const DUR = { in: 0.4, cam: 0.6, pop: 0.25, out: 0.25, swap: 0.15 };
+
+  // 终端格子：18px JetBrains Mono，一格 0.6em 宽
+  const CW = 10.8, CH = 18.5, PAD = 16, COLS = 160, ROWS = 46;
+  const VW = 1760, VH = 700;
+  const NAMED = { default: 'var(--term-fg)', fg: 'var(--term-fg)', bg: 'var(--win)' };
+  const color = c => (/^[0-9a-f]{6}$/i.test(c) ? '#' + c : NAMED[c] || 'var(--term-fg)');
+  const bgColor = c => (c === 'default' ? null : /^[0-9a-f]{6}$/i.test(c) ? '#' + c : NAMED[c] || null);
+  const T = window.TERM;
+
+  function rowText(row) { return row.map(s => s[0]).join(''); }
+  function rowOf(name, marker) { return T[name].rows.findIndex(r => rowText(r).includes(marker)); }
+
+  // JetBrains Mono 里没有、回退字体又比一格宽的符号：单独占一格，字形缩到 0.6em 居中
+  const NARROW_FIT = new Set([...'⎿⏸⏺▰▱○✓✢✳✶✻✽']);
+
+  // 一行按列裁剪成 span：同样式的窄字符连成一段，宽字符（中文）单独一段占 2 格
+  function rowHtml(row, c0, c1) {
+    let x = 0, out = '';
+    const emit = (part, cells, fg, bg, bold, fit) => {
+      const style = `width:${cells}ch;color:${color(fg)};` + (bgColor(bg) ? `background:${bgColor(bg)};` : '') + (bold ? 'font-weight:700;' : '');
+      const text = part.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      // 终端行高 18.5px 比中文排版框矮，相邻行的框会相交，字形本身不重叠
+      out += `<span data-layout-allow-overlap${fit ? ' class="fit"' : ''} style="${style}">${fit ? `<i>${text}</i>` : text}</span>`;
+    };
+    for (const [text, cells, fg, bg, bold] of row) {
+      if (cells === 2) {
+        if (x >= c0 && x + 2 <= c1) emit(text, 2, fg, bg, bold, false);
+        x += 2;
+        continue;
+      }
+      let run = '';
+      const flush = () => { if (run) emit(run, run.length, fg, bg, bold, false); run = ''; };
+      for (const ch of text) {
+        if (x >= c0 && x < c1) {
+          if (NARROW_FIT.has(ch)) { flush(); emit(ch, 1, fg, bg, bold, true); } else run += ch;
+        }
+        x += 1;
+      }
+      flush();
+    }
+    return out;
+  }
+
+  function grid(name, c0 = 0, c1 = COLS, r0 = 0, r1 = ROWS) {
+    const el = document.createElement('div');
+    el.className = 'grid';
+    el.innerHTML = T[name].rows.slice(r0, r1).map(r => `<div class="row">${rowHtml(r, c0, c1)}</div>`).join('');
+    return el;
+  }
+
+  function shot(name, c0 = 0, c1 = COLS) {
+    const el = document.createElement('div');
+    el.className = 'shot';
+    el.style.left = `${PAD + c0 * CW}px`;
+    el.appendChild(grid(name, c0, c1));
+    const img = T[name].img;
+    if (img && c0 <= img[1]) {
+      const pic = document.createElement('img');
+      pic.src = './assets/ipad-home.jpg';
+      Object.assign(pic.style, { top: `${img[0] * CH}px`, left: `${(img[1] - c0) * CW}px`, width: `${img[3] * CW}px`, height: `${img[2] * CH}px` });
+      el.appendChild(pic);
+    }
+    document.getElementById('cam').appendChild(el);
+    return el;
+  }
+
+  // 镜头：把第 r0–r1 行、第 c0–c1 列放进取景框
+  function fit(r0, r1, c0, c1, left = false) {
+    const scale = Math.min(VW / ((c1 - c0) * CW), VH / ((r1 - r0) * CH));
+    const x = (left ? 40 : (VW - (c1 - c0) * CW * scale) / 2) - (PAD + c0 * CW) * scale;
+    const y = (VH - (r1 - r0) * CH * scale) / 2 - r0 * CH * scale;
+    return { x, y, scale };
+  }
+  const WIDE = fit(0, ROWS, 0, COLS);
+
+  // 每个画面里要强调的那一行（实录数据里找）
+  const R = {
+    blue: rowOf('shotBand', '▍截图'),
+    eta2: rowOf('eta2', '▍进度'),
+    eta3: rowOf('eta3', '▍进度'),
+    green: rowOf('slim', '▍精简'),
+    done: rowOf('stepsDone', '▍进度'),
+  };
+
+  // 实录画面
+  const boot = shot('boot');
+  const shotBand = shot('shotBand');
+  const paneL = shot('shotPane', 0, 88), paneR = shot('shotPane', 88);
+  const eta2 = shot('eta2'), eta3 = shot('eta3');
+  const midL = shot('stepsMid', 0, 88), midR = shot('stepsMid', 88);
+  const doneL = shot('stepsDone', 0, 88), doneR = shot('stepsDone', 88);
+  const slim = shot('slim');
+  const blueRow = shotBand.querySelectorAll('.row')[R.blue];
+  const greenRow = slim.querySelectorAll('.row')[R.green];
+
+  // 收尾的三行：取实录里三行同时出现的那一帧
+  const trioRows = ['▍截图', '▍进度', '▍精简'].map(m => rowOf('trio', m));
+  const trio = document.createElement('div');
+  trio.className = 'grid';
+  trio.innerHTML = trioRows.map(r => `<div class="row">${rowHtml(T.trio.rows[r], 0, 70)}</div>`).join('');
+  document.getElementById('trio').appendChild(trio);
+
+  const $ = s => document.querySelector(s);
+  const $$ = s => [...document.querySelectorAll(s)];
+  const cam = $('#cam'), win = $('#win');
+
+  // DET-006：初始状态在时间线外设定
+  gsap.set(win, { opacity: 0, y: 24 });
+  gsap.set(cam, WIDE);
+  gsap.set($('#title'), { y: -40 });
+  gsap.set(['#tree', '#code'], { x: 120 });
+  gsap.set($$('.tag'), { scale: 0.6 });
+  gsap.set(['#mark', '#trio'], { y: -60 });
+  gsap.set(blueRow, { opacity: 0 });
+  gsap.set(greenRow, { opacity: 0 });
+  gsap.set(paneR, { x: 780 });
+  gsap.set(midR, { x: 780 });
+
+  const tl = gsap.timeline({ paused: true });
+  // 瞬切：在拍点那一帧就生效（DET-006 只禁止第 0 秒的 tl.set）
+  const show = (els, at) => tl.set(els, { opacity: 1 }, at);
+  const hide = (els, at) => tl.set(els, { opacity: 0 }, at);
+  const press = (el, at) => tl.to(el, { y: 6, duration: 0.06 }, at).to(el, { y: 0, duration: 0.12 }, at + 0.1);
+
+  // 1 · 开场（0.0–4.0）
+  tl.to(win, { opacity: 1, y: 0, duration: 0.5, ease: EASE.in }, 0);
+  tl.to($('#shell .typed'), { width: '6ch', duration: 0.75, ease: 'steps(6)' }, 0.375);
+  hide($('#shell'), 1.5);
+  show(boot, 1.5);
+  tl.set(cam, fit(0, 5, 0, 60), 1.5);
+  tl.to($('#title'), { opacity: 1, y: 0, duration: DUR.pop, ease: EASE.land }, 1.75);
+  tl.to(win, { y: 250, scale: 0.6, duration: 0.4, ease: EASE.in }, 1.6);
+  tl.to([$('#title'), win], { x: -220, opacity: 0, duration: DUR.out, ease: EASE.out }, 3.75);
+
+  // 2 · mod 是什么（4.0–9.0）
+  tl.to(['#tree', '#code'], { x: 0, opacity: 1, duration: DUR.in, ease: EASE.in }, 3.8);
+  $$('#tree .line').forEach((el, i) => tl.to(el, { opacity: 1, duration: DUR.swap }, 4.0 + i * 0.25));
+  $$('#code .line').forEach((el, i) => tl.to(el, { opacity: 1, duration: DUR.swap }, i === 4 ? 4.5 : 4.5 + i * 0.5));
+  // 标签弹入要快，变化最大的那一帧落在拍点上，与 pop 音效同帧（AUD-002）
+  $$('.tag').forEach((el, i) => tl.to(el, { opacity: 1, scale: 1, duration: 0.15, ease: EASE.pop }, 6.467 + i * 0.5));
+  tl.to($('#cap2'), { opacity: 1, duration: 0.3 }, 7.5);
+  tl.to(['#tree', '#code', '#cap2'], { x: -220, opacity: 0, duration: DUR.out, ease: EASE.out }, 8.75);
+
+  // 3 · shot-view（9.0–17.0）
+  hide(boot, 8.7);
+  show(shotBand, 8.7);
+  tl.set(cam, WIDE, 8.7);
+  tl.set(win, { x: 220, y: 0, scale: 1 }, 8.7);
+  tl.to(win, { x: 0, opacity: 1, duration: DUR.in, ease: EASE.in }, 8.8);
+  tl.to($('#badge1'), { opacity: 1, duration: 0.2 }, 9.0);
+  show(blueRow, 10.0);
+  tl.to(cam, { ...fit(R.blue - 1, R.blue + 2, 0, 66, true), duration: DUR.cam, ease: EASE.cam }, 10.0);
+  tl.to($('#fade'), { opacity: 1, duration: 0.3 }, 10.0);
+  tl.to(cam, { ...WIDE, duration: 0.3, ease: EASE.cam }, 11.2);
+  tl.to($('#fade'), { opacity: 0, duration: 0.2 }, 11.2);
+  tl.set($('#key2'), { textContent: 's' }, 11.2);
+  tl.to($('#keys'), { opacity: 1, duration: 0.2 }, 11.2);
+  press($('#keys .key'), 11.5);
+  press($('#key2'), 11.75);
+  hide(shotBand, 11.85);
+  show([paneL, paneR], 11.85);
+  tl.to(paneR, { x: 0, duration: DUR.in, ease: EASE.in }, 11.8);
+  tl.to($('#keys'), { opacity: 0, duration: 0.2 }, 12.5);
+  tl.to($('#cap3'), { opacity: 1, duration: 0.3 }, 12.5);
+  tl.to(['#cap3', '#badge1'], { opacity: 0, duration: DUR.out }, 16.75);
+  tl.to([paneL, paneR], { opacity: 0, duration: DUR.out }, 16.75);
+
+  // 4 · task-eta（17.0–25.0）
+  tl.set(cam, WIDE, 16.99);
+  tl.to(eta2, { opacity: 1, duration: DUR.swap }, 17.0);
+  tl.to($('#badge2'), { opacity: 1, duration: 0.2 }, 17.0);
+  tl.to(cam, { ...fit(R.eta2 - 1, R.eta2 + 2, 0, 66, true), duration: DUR.cam, ease: EASE.cam }, 17.5);
+  tl.to($('#fade'), { opacity: 1, duration: 0.3 }, 17.5);
+  hide(eta2, 18.5);
+  show(eta3, 18.5);
+  tl.to(cam, { ...WIDE, duration: 0.3, ease: EASE.cam }, 19.2);
+  tl.to($('#fade'), { opacity: 0, duration: 0.2 }, 19.2);
+  tl.set($('#key2'), { textContent: 'p' }, 19.2);
+  tl.to($('#keys'), { opacity: 1, duration: 0.2 }, 19.2);
+  press($('#keys .key'), 19.5);
+  press($('#key2'), 19.75);
+  hide(eta3, 19.85);
+  show([midL, midR], 19.85);
+  tl.to(midR, { x: 0, duration: DUR.in, ease: EASE.in }, 19.8);
+  tl.to($('#keys'), { opacity: 0, duration: 0.2 }, 20.5);
+  tl.to(cam, { ...fit(0, 11, 89, 155), duration: DUR.cam, ease: EASE.cam }, 20.5);
+  tl.to($('#cap4'), { opacity: 1, duration: 0.3 }, 20.5);
+  hide([midL, midR], 22.5);
+  show([doneL, doneR], 22.5);
+  tl.to(cam, { ...fit(R.done - 1, R.done + 2, 0, 66, true), duration: DUR.cam, ease: EASE.cam }, 23.2);
+  tl.to(['#cap4', '#badge2'], { opacity: 0, duration: DUR.out }, 24.75);
+  tl.to([doneL, doneR], { opacity: 0, duration: DUR.out }, 24.75);
+
+  // 5 · ctx-slim（25.0–30.0）
+  tl.set(cam, WIDE, 24.99);
+  tl.to(slim, { opacity: 1, duration: DUR.swap }, 25.0);
+  tl.to($('#badge3'), { opacity: 1, duration: 0.2 }, 25.0);
+  show(greenRow, 25.5);
+  tl.to(cam, { ...fit(R.green - 1, R.green + 2, 0, 66, true), duration: DUR.cam, ease: EASE.cam }, 25.5);
+  tl.to($('#chips'), { opacity: 1, duration: 0.3 }, 26.1);
+  $$('.chip').forEach((el, i) => {
+    tl.to(el.querySelector('s'), { scaleX: 1, duration: 0.12 }, 26.38 + i * 0.5);
+    tl.to(el, { opacity: 0.25, duration: 0.2 }, 26.5 + i * 0.5);
+  });
+  const saved = { n: 0 };
+  tl.to(saved, { n: 2172, duration: 1.0, ease: 'none', onUpdate: () => { $('#saved').textContent = `−${Math.round(saved.n)} 字符`; } }, 26.5);
+  tl.to($('#cap5'), { opacity: 1, duration: 0.3 }, 27.0);
+  tl.to([win, '#badge3', '#chips', '#cap5'], { opacity: 0, duration: 0.4, ease: EASE.out }, 30.0);
+
+  // 6 · 收尾（30.5–36.0）
+  tl.to(['#mark', '#trio'], { opacity: 1, y: 0, duration: DUR.pop, ease: EASE.land }, 30.25);
+  tl.to($('#install .typed'), { width: '47ch', duration: 1.5, ease: 'steps(47)' }, 31.5);
+  tl.to($('#url'), { opacity: 1, duration: 0.3 }, 33.5);
+
+  window.__timelines["main"] = tl;
+</script>
+</body>
+</html>

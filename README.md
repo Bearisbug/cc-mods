@@ -4,6 +4,10 @@
 
 ![三个 mod 同时出现在输入框上方](docs/band.png)
 
+36 秒介绍视频（点图打开 mp4）：
+
+[![cc-mods 介绍视频](docs/video-poster.jpg)](brand/promo/intro-36s/renders/cc-mods-intro.mp4)
+
 ## mod 是什么
 
 mod 是 Claude Code v2.1.287 引入的一种插件：插件里放一个 JavaScript / TypeScript 模块，注册一组事件处理函数，在 Claude Code 进程里运行。它能在输入框上方的条带和侧边面板里画界面、注册斜杠命令、在工具调用前后插一手，这些是 settings 里的 hook、skill 和 MCP 做不到的。v2.1.287 起默认开启。官方文档：<https://code.claude.com/docs/en/plugins/mods/overview>
@@ -111,7 +115,9 @@ claude plugin test shot-view          # 跑 tests/ 里的测试
 claude --plugin-dir ./shot-view       # 只在这一个会话里加载，存盘自动重载
 ```
 
-README 里的终端画面来自真实会话的录屏数据；shot-view 面板里的图片区域是后期合成的，因为录屏用的终端模拟器不支持 kitty 图形协议。
+`brand/promo/intro-36s/` 是介绍视频的源码（HyperFrames 0.8.96 + GSAP），分镜在 `storyboard.md`，录屏数据在 `assets/term.js`。改了以后在该目录运行 `npm ci`，再 `npx hyperframes render . -o renders/cc-mods-intro.mp4 --strict` 重新出片。
+
+README 和视频里的终端画面来自真实会话的录屏数据；shot-view 面板里的图片区域是后期合成的，因为录屏用的终端模拟器不支持 kitty 图形协议。
 
 ## 许可
 
