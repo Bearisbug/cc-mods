@@ -266,6 +266,62 @@ function bar(done: number, total: number, cells = 8): string {
   return '▰'.repeat(filled) + '▱'.repeat(cells - filled)
 }
 
+// 终端里汉字、全角标点和 emoji 占两格
+export function cells(s: string): number {
+  let n = 0
+  for (const ch of s) {
+    const c = ch.codePointAt(0) ?? 0
+    const isWide =
+      (c >= 0x1100 && c <= 0x115f) ||
+      (c >= 0x2e80 && c <= 0xa4cf) ||
+      (c >= 0xac00 && c <= 0xd7a3) ||
+      (c >= 0xf900 && c <= 0xfaff) ||
+      (c >= 0xfe30 && c <= 0xfe4f) ||
+      (c >= 0xff00 && c <= 0xff60) ||
+      (c >= 0xffe0 && c <= 0xffe6) ||
+      c >= 0x1f300
+    n += isWide ? 2 : 1
+  }
+  return n
+}
+
+function clip(s: string, width: number): string {
+  if (cells(s) <= width) return s
+  let out = ''
+  for (const ch of s) {
+    if (cells(out + ch) > width - 1) break
+    out += ch
+  }
+  return out + '…'
+}
+
+// 条带里的一段：rank 越小越要紧；相邻两段都是 isDim 时用「 · 」连成一段文字，否则隔一个空格
+export type Part = { text: string; rank: number; color?: string; isDim?: boolean }
+const BAND_LABEL = '▍进度'
+const MIN_HEAD = 24
+
+function lineWidth(parts: Part[], headWidth: number): number {
+  return parts.reduce(
+    (n, p, i) => n + (i > 0 && p.isDim && parts[i - 1]?.isDim ? 3 : 1) + (i === 0 ? headWidth : cells(p.text)),
+    cells(BAND_LABEL),
+  )
+}
+
+// 条带固定一行（右边停着面板时可用宽度只剩一半）：第一段必留，其余按 rank 从小到大放得下才放，
+// 放不下的整段不显示；第一段最后按剩下的宽度截断，挑段时先给它留 MIN_HEAD 格
+export function fitBand(parts: Part[], width: number): Part[] {
+  const [head, ...rest] = parts
+  if (!head) return []
+  let kept: Part[] = [head]
+  const headMin = Math.min(cells(head.text), MIN_HEAD)
+  for (const p of [...rest].sort((a, b) => a.rank - b.rank)) {
+    const next = parts.filter(q => q === p || kept.includes(q))
+    if (lineWidth(next, headMin) <= width) kept = next
+  }
+  const room = width - lineWidth(kept, 0)
+  return [{ ...head, text: clip(head.text, Math.max(2, room)) }, ...kept.slice(1)]
+}
+
 function isRunningVisible(t: Task, now: number): boolean {
   return t.isAsked || t.items.length > 0 || t.isBusy || elapsed(t, now) >= PLAN_AFTER_MS
 }
@@ -564,53 +620,58 @@ export const register: Register = on => {
     const cur = t.items[at]
     const doneCount = finishedCount(t)
 
-    let body
+    const hint: Part = { text: `${TOGGLE_KEY} 看步骤`, rank: 2, isDim: true }
+    let parts: Part[]
     if (!isRunning) {
-      const word = endingLabel(t.ending, t.isFinalChecking)
+      const total = t.items.length
       const skipped = t.items.filter(i => i.status === 'skipped').length
-      const tail = t.isFinalChecking
-        ? `Claude 在确认哪些步骤真的做完了 · 已打勾 ${doneCount}/${t.items.length}`
+      const word: Part = { text: endingLabel(t.ending, t.isFinalChecking), rank: 0 }
+      parts = t.isFinalChecking
+        ? [word, { text: 'Claude 在确认哪些步骤真的做完了', rank: 3, isDim: true }, { text: `已打勾 ${doneCount}/${total}`, rank: 1, isDim: true }, hint]
         : t.ending === 'done'
-          ? `用时 ${spent(elapsed(t, now))}${skipped > 0 ? ` · ${skipped} 步后来不需要了` : ''}`
+          ? [word, { text: `用时 ${spent(elapsed(t, now))}`, rank: 1, isDim: true }, ...(skipped > 0 ? [{ text: `${skipped} 步后来不需要了`, rank: 3, isDim: true }] : []), hint]
           : t.ending === 'unchecked'
-            ? `完成 ${doneCount}/${t.items.length} 步（未经 Claude 确认）· 面板里按 c 重试`
-            : `完成 ${doneCount}/${t.items.length} 步 · 下一条消息接着这份清单`
-      body = [
-        <Text key="word">{word}</Text>,
-        <Text key="tail" dimColor>
-          {tail} · {TOGGLE_KEY} 看步骤
-        </Text>,
-      ]
+            ? [word, { text: `完成 ${doneCount}/${total} 步（未经 Claude 确认）`, rank: 1, isDim: true }, { text: '面板里按 c 重试', rank: 3, isDim: true }, hint]
+            : [word, { text: `完成 ${doneCount}/${total} 步`, rank: 1, isDim: true }, { text: '下一条消息接着这份清单', rank: 4, isDim: true }, hint]
     } else if (!cur) {
-      body = [
-        <Text key="state">{t.isBusy ? '正在估算步骤…' : t.isWaitingFirstReply ? '等 Claude 第一次回复后估算' : '还没有步骤估算'}</Text>,
-        <Text key="meta" dimColor>
-          已 {spent(elapsed(t, now))} · {t.tools} 次工具调用 · {TOGGLE_KEY} 看步骤
-        </Text>,
+      parts = [
+        { text: t.isBusy ? '正在估算步骤…' : t.isWaitingFirstReply ? '等 Claude 第一次回复后估算' : '还没有步骤估算', rank: 0 },
+        { text: `已 ${spent(elapsed(t, now))}`, rank: 3, isDim: true },
+        { text: `${t.tools} 次工具调用`, rank: 4, isDim: true },
+        { ...hint, rank: 1 },
       ]
     } else {
       const remain = left(t, now)
       const nextItem = t.items[at + 1]
-      body = [
-        <Text key="step">
-          {at + 1}/{t.items.length} {cur.title}
-        </Text>,
-        <Text key="bar" color="autoAccept">
-          {bar(doneCount, t.items.length)}
-        </Text>,
-        <Text key="meta" dimColor>
-          已 {spent(elapsed(t, now))} · {remain > 0 ? `约剩 ${duration(remain)}` : '已超出预估'}
-          {nextItem ? ` · 下一步 ${nextItem.title}` : ''} · {TOGGLE_KEY} 看步骤
-        </Text>,
+      parts = [
+        { text: `${at + 1}/${t.items.length} ${cur.title}`, rank: 0 },
+        { text: bar(doneCount, t.items.length), rank: 2, color: 'autoAccept' },
+        { text: `已 ${spent(elapsed(t, now))}`, rank: 4, isDim: true },
+        { text: remain > 0 ? `约剩 ${duration(remain)}` : '已超出预估', rank: 1, isDim: true },
+        ...(nextItem ? [{ text: `下一步 ${nextItem.title}`, rank: 5, isDim: true }] : []),
+        { ...hint, rank: 3 },
       ]
+    }
+    const runs: Part[] = []
+    // 右端 4 格是 Claude Code 自己画的折叠按钮「 [-]」，bodyColumns 里含着它
+    for (const p of fitBand(parts, e.props.bodyColumns - 4)) {
+      const last = runs.at(-1)
+      if (last?.isDim && p.isDim) last.text += ` · ${p.text}`
+      else runs.push({ ...p })
     }
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1}>
-          <Text color="autoAccept" bold>
-            ▍进度
-          </Text>
-          {body}
+          <Box flexShrink={0}>
+            <Text color="autoAccept" bold>
+              {BAND_LABEL}
+            </Text>
+          </Box>
+          {runs.map((r, i) => (
+            <Text key={String(i)} color={r.color} dimColor={r.isDim} wrap="truncate-end">
+              {r.text}
+            </Text>
+          ))}
         </Box>
         {below}
       </Box>

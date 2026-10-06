@@ -2,17 +2,20 @@ import { describe, expect, mock, test } from 'claude-code/testing'
 
 import {
   applyCheck,
+  cells,
   checkPrompt,
   endingLabel,
   planPrompt,
   describe as describeCall,
   duration,
+  fitBand,
   parseCheck,
   parsePlan,
   remainingMinutes,
   spent,
   stepAfter,
 } from '../hooks/register'
+import type { Part } from '../hooks/register'
 
 const PLAN = [
   { title: '跑单元测试', signals: ['npm test', 'vitest'], minutes: 4 },
@@ -324,10 +327,14 @@ test('D: the progress line is one row of Texts, not a nested column', async ($, 
   await $.turn.start({ text: '跑测试再构建', turnId: 't1' })
   await $.command.run({ command: 'steps', ...RUN })
   await clock.settle()
-  const tree = (await band.drawn()) as unknown as { children: { props: { flexDirection?: string }; children: { type: string }[] }[] }
+  const tree = (await band.drawn()) as unknown as {
+    children: { props: { flexDirection?: string }; children: { type: string; props: { flexShrink?: number } }[] }[]
+  }
   const row = tree.children[0]
   expect(row?.props.flexDirection).toBe('row')
-  expect(row?.children.map(c => c.type)).toEqual(['Text', 'Text', 'Text', 'Text'])
+  // 标签包在不收缩的 Box 里，窄的时候「进度」两个字不会被拆成两行
+  expect(row?.children.map(c => c.type)).toEqual(['Box', 'Text', 'Text', 'Text'])
+  expect(row?.children[0]?.props.flexShrink).toBe(0)
   await band.unmount()
 })
 
@@ -522,4 +529,63 @@ describe('G: every way a turn can end leaves an honest state', () => {
     expect(endingLabel('paused', false)).toBe('未完成')
     expect(endingLabel('done', true)).toBe('正在核对…')
   })
+})
+
+describe('the band stays on one line', () => {
+  // 截图里折成两行的那条
+  const parts: Part[] = [
+    { text: '4/8 候选提示词出屏', rank: 0 },
+    { text: '▰▰▰▰▱▱▱▱', rank: 2, color: 'autoAccept' },
+    { text: '已 16 分', rank: 4, isDim: true },
+    { text: '约剩 43 分', rank: 1, isDim: true },
+    { text: '下一步 生成盲评对', rank: 5, isDim: true },
+    { text: 'ctrl+x p 看步骤', rank: 3, isDim: true },
+  ]
+  const widthOf = (ps: Part[]) =>
+    ps.reduce((n, p, i) => n + (i > 0 && p.isDim && ps[i - 1]?.isDim ? 3 : 1) + cells(p.text), cells('▍进度'))
+  const texts = (ps: Part[]) => ps.map(p => p.text)
+
+  test('counts Chinese characters as two cells', () => {
+    expect(cells('进度 4/8')).toBe(8)
+    expect(cells('▰▱…')).toBe(3)
+  })
+
+  test('a wide band keeps everything; a narrower one drops whole parts, least important first', () => {
+    expect(fitBand(parts, 140)).toEqual(parts)
+    expect(texts(fitBand(parts, 90))).toEqual(['4/8 候选提示词出屏', '▰▰▰▰▱▱▱▱', '已 16 分', '约剩 43 分', 'ctrl+x p 看步骤'])
+    expect(texts(fitBand(parts, 60))).toEqual(['4/8 候选提示词出屏', '▰▰▰▰▱▱▱▱', '已 16 分', '约剩 43 分'])
+    expect(texts(fitBand(parts, 40))).toEqual(['4/8 候选提示词出屏', '约剩 43 分'])
+  })
+
+  test('when only the step fits, its title is cut with an ellipsis', () => {
+    expect(texts(fitBand(parts, 20))).toEqual(['4/8 候选提示…'])
+  })
+
+  test('a long title gives way to the remaining time first, then fills what is left', () => {
+    const long: Part[] = [{ ...parts[0]!, text: `4/8 ${'候选提示词出屏'.repeat(6)}` }, ...parts.slice(1)]
+    for (const width of [30, 50, 70, 90, 120]) {
+      const line = fitBand(long, width)
+      expect(widthOf(line)).toBeLessThanOrEqual(width)
+      if (width >= 50) expect(texts(line)).toContain('约剩 43 分')
+      expect(line[0]!.text.endsWith('…')).toBe(true)
+    }
+  })
+
+  test('every width from 10 to 140 fits', () => {
+    for (let width = 10; width <= 140; width++) expect(widthOf(fitBand(parts, width))).toBeLessThanOrEqual(Math.max(width, cells('▍进度') + 3))
+  })
+})
+
+test('with a pane docked beside it the band drops the next step rather than wrapping', async ($, on) => {
+  const clock = mock.clock(on)
+  engine(on, { check: '{"done":[],"current":1,"add":[]}' })
+  const band = await $.ui.mount({ plugin: 'task-eta', surface: 'terminal', component: 'AbovePrompt', props: { ...BAND_PROPS, bodyColumns: 40 } })
+  await $.turn.start({ text: '跑测试再构建', turnId: 't1' })
+  await $.command.run({ command: 'steps', ...RUN })
+  await clock.settle()
+  expect(await band.find({ type: 'Text', text: '▍进度' })).toBeDefined()
+  expect(await band.find({ text: '1/3 跑单元测试' })).toBeDefined()
+  expect(await band.find({ text: /约剩/ })).toBeDefined()
+  expect(await band.find({ text: /下一步/ })).toBeUndefined()
+  await band.unmount()
 })
