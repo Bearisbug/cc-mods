@@ -89,6 +89,51 @@ function basename(path: string): string {
   return path.slice(path.lastIndexOf('/') + 1)
 }
 
+// 终端里汉字、全角标点和 emoji 占两格
+export function cells(s: string): number {
+  let n = 0
+  for (const ch of s) {
+    const c = ch.codePointAt(0) ?? 0
+    const isWide =
+      (c >= 0x1100 && c <= 0x115f) ||
+      (c >= 0x2e80 && c <= 0xa4cf) ||
+      (c >= 0xac00 && c <= 0xd7a3) ||
+      (c >= 0xf900 && c <= 0xfaff) ||
+      (c >= 0xfe30 && c <= 0xfe4f) ||
+      (c >= 0xff00 && c <= 0xff60) ||
+      (c >= 0xffe0 && c <= 0xffe6) ||
+      c >= 0x1f300
+    n += isWide ? 2 : 1
+  }
+  return n
+}
+
+// 从中间截短：截图文件名的开头和结尾（时间戳、.png）都留着
+function clipMiddle(s: string, width: number): string {
+  if (cells(s) <= width) return s
+  const chars = [...s]
+  let head = ''
+  let tail = ''
+  let i = 0
+  let j = chars.length - 1
+  while (i < j && cells(head + chars[i]) <= Math.ceil((width - 1) / 2)) head += chars[i++]
+  while (j >= i && cells(head) + 1 + cells(chars[j] + tail) <= width) tail = chars[j--] + tail
+  return `${head}…${tail}`
+}
+
+const BAND_LABEL = '▍截图'
+const MIN_HEAD = 20
+
+// 条带固定一行。右端 4 格是 Claude Code 自己画的折叠按钮「 [-]」，bodyColumns 里含着它。
+// 放不下时先去掉快捷键提示，再去掉张数，最后从中间截短文件名
+export function bandLine(name: string, unread: number, bodyColumns: number): { head: string; tail: string } {
+  const room = bodyColumns - 4 - cells(BAND_LABEL) - 1
+  const head = `新增 ${name}`
+  const headMin = Math.min(cells(head), MIN_HEAD)
+  const tail = [`未读 ${unread} 张 · ctrl+x s 查看`, `未读 ${unread} 张`].find(t => headMin + 1 + cells(t) <= room) ?? ''
+  return { head: clipMiddle(head, Math.max(2, room - (tail ? cells(tail) + 1 : 0))), tail }
+}
+
 function ago(at: number): string {
   const min = Math.floor((Date.now() - at) / 60_000)
   return min < 1 ? '刚刚' : `${min} 分钟前`
@@ -245,14 +290,21 @@ export const register: Register = on => {
     if (!live.has(hint)) hint = unread.find(s => live.has(s.path))?.path ?? null
     if (!hint || e.props.hasSurvey) return below
     const { Box, Text } = $.ui.resolve(e)
+    const line = bandLine(basename(hint), live.size, e.props.bodyColumns)
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1}>
-          <Text color="ide" bold>
-            ▍截图
-          </Text>
-          <Text>新增 {basename(hint)}</Text>
-          <Text dimColor>未读 {live.size} 张 · ctrl+x s 查看</Text>
+          <Box flexShrink={0}>
+            <Text color="ide" bold>
+              {BAND_LABEL}
+            </Text>
+          </Box>
+          <Text wrap="truncate-end">{line.head}</Text>
+          {line.tail !== '' && (
+            <Text dimColor wrap="truncate-end">
+              {line.tail}
+            </Text>
+          )}
         </Box>
         {below}
       </Box>

@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 
-import { findPngPaths, resolvePath } from '../hooks/register'
+import { bandLine, cells, findPngPaths, resolvePath } from '../hooks/register'
 
 describe('findPngPaths', () => {
   test('finds absolute, relative and home paths once each', () => {
@@ -314,4 +314,30 @@ test('files deleted outside the session update the band on their own, and the ch
   await clock.advance(20_000)
   expect(stats).toBe(settled)
   await band.unmount()
+})
+
+describe('the band stays on one line', () => {
+  const NAME = 'simulator-screenshot-iphone-16-pro-2026-10-06-at-10.22.33.png'
+  // 标签、间隔和右端 Claude Code 的「 [-]」之外，这一行实际占的格数
+  const widthOf = (line: { head: string; tail: string }) => cells('▍截图') + 1 + cells(line.head) + (line.tail ? 1 + cells(line.tail) : 0) + 4
+
+  test('a short name with room to spare shows everything', () => {
+    expect(bandLine('home.png', 2, 140)).toEqual({ head: '新增 home.png', tail: '未读 2 张 · ctrl+x s 查看' })
+  })
+
+  test('a long name is cut in the middle, keeping its timestamp and .png', () => {
+    const line = bandLine(NAME, 3, 70)
+    expect(line.tail).toBe('未读 3 张 · ctrl+x s 查看')
+    expect(line.head).toMatch(/^新增 simulator-.*….*10\.22\.33\.png$/)
+    expect(widthOf(line)).toBeLessThanOrEqual(70)
+  })
+
+  test('narrower, the shortcut goes first, then the count', () => {
+    expect(bandLine('home.png', 2, 40).tail).toBe('未读 2 张')
+    expect(bandLine(NAME, 2, 30).tail).toBe('')
+  })
+
+  test('every width from 20 to 160 fits', () => {
+    for (let width = 20; width <= 160; width++) expect(widthOf(bandLine(NAME, 12, width))).toBeLessThanOrEqual(width)
+  })
 })
