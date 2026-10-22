@@ -1,6 +1,6 @@
 # cc-mods
 
-三个 Claude Code mod：截图面板 **shot-view**、长任务进度 **task-eta**、按目录精简 MCP 说明 **ctx-slim**。三个 mod 各在输入框上方画一行，颜色分别是蓝、紫、绿，不再用 Claude Code 自带的橙色 ⚠ 状态行。
+五个 Claude Code mod：截图面板 **shot-view**、长任务进度 **task-eta**、按目录精简 MCP 说明 **ctx-slim**、自定义命令速查 **cmds**、等你拍板的待定面板 **decide**。前三个各在输入框上方画一行，颜色分别是蓝、紫、绿，不再用 Claude Code 自带的橙色 ⚠ 状态行；cmds 用 `/cmds` 打开速查面板，空闲时在提示行末尾介绍一条命令；decide 在 Claude 登记了要你定的事时在右上角弹出提醒，`/decide` 打开面板作答。
 
 ![三个 mod 同时出现在输入框上方](docs/band.png)
 
@@ -21,6 +21,8 @@ claude plugin marketplace add Bearisbug/cc-mods
 claude plugin install shot-view@cc-mods
 claude plugin install task-eta@cc-mods
 claude plugin install ctx-slim@cc-mods
+claude plugin install cmds@cc-mods
+claude plugin install decide@cc-mods
 ```
 
 已经开着的会话要运行 `/reload-plugins` 或新开会话才会加载。
@@ -100,6 +102,45 @@ claude plugin install ctx-slim@cc-mods
 
 上面那段示例是作者自己的规则：kando 的说明只在路径含 kando 时保留，synco 的说明在 CLAUDE.md 里有 Synco 的 project-context 标记、或路径含 synco 时保留，shadcn-io 的说明只在能找到 `package.json` 的前端项目里保留。
 
+## cmds · 自定义命令速查
+
+- `/cmds` 打开速查面板，再输一次关掉；Claude 回答到一半时输入也立刻生效，不用等这一轮结束。面板里列出 `~/.claude/commands/`（设了 `CLAUDE_CONFIG_DIR` 时是它下面的 `commands/`）和当前项目 `.claude/commands/` 里的命令：第一行是命令名和 frontmatter 里的 `argument-hint`，第二行是用途，取 `description` 在括号外第一个冒号或分号之前的那段。同名命令以项目里的为准。
+- 面板打开就拿着键盘：↑↓ 滚动，Esc 关掉，这时的 Esc 只关面板，不会中断 Claude。和 shot-view 的截图面板一样，全屏模式下窗口有 110 列以上时停靠在右侧、占满整个高度，其余时候在输入框上方，最高 16 行。
+- 输入框空着、Claude 没在工作时，提示行末尾轮换介绍一条命令，例如「/trim 精简代码 · /cmds 看全部」，每过一轮换下一条。
+- 新加的命令文件在下次打开面板或新开会话时出现。只读两个目录顶层的 `.md` 文件，子目录里的命令不列。
+- 没配分组时按名字排成一组。
+
+### 配置 cmds
+
+分组可以在 `/config` 里的「短命令分组」填一行，或者运行 `/plugin configure cmds@cc-mods`，也可以直接写进 `~/.claude/settings.json`：
+
+```json
+{
+  "pluginConfigs": {
+    "cmds@cc-mods": {
+      "options": {
+        "groups": "开工前: catchup flow raise dev; 交给它做: autopilot wf; 改代码与提交: trim scalpel ship; 线上: triage prod-tune; 后台与其他窗口: progress relay; 本机与账号: key disk weekly"
+      }
+    }
+  }
+}
+```
+
+格式是 `组名: 命令 命令; 组名: 命令`，组之间用分号或换行隔开，命令之间用空格、逗号或顿号，命令名前的 `/` 可写可不写。分组按写的顺序显示，没写进任何组的命令排在最后的「其他」，写了但本机没有的命令跳过。上面那段是作者自己的分组。
+
+## decide · 等你拍板
+
+- Claude 遇到只有你能定、不能按推荐直接做的事，除了照常写在回复里，还会调用 decide 提供的工具 `pending` 登记：一句问题、可选答案（推荐项排第一）、推荐哪个及理由、做决定需要的背景。
+- 登记后右上角弹出提醒，例如「2 项等你拍板 · /decide 回答：D1 要不要改名 /prod-tune？；D2 …」，最多三行，20 秒后消失，点一下提前关掉。每轮结束时还有没答的会再弹一次，上一条还没消失时不重复弹。输入框上方一直显示黄色的「▍待定 N 项等你拍板 /decide 打开」，你可以先去做别的，想好了再回来答。
+- `/decide` 打开面板列出全部待定项，再输一次关掉，面板开着时输入框上方那一行不显示。和 `/cmds` 一样，Claude 回答到一半时也立刻生效，面板打开就拿着键盘，焦点落在第一个选项上，Esc 关掉，放的位置也一样。每项列出问题、背景和推荐；有选项的每个选项是一个按钮，旁边的「补充」栏可以写说明；开放问题在「答复」栏写；不用再定的按「移除」。
+- 选项按顺序配了数字 1–9，直接按数字就选上，再按一次取消；底部「0: 提交已答的 N 项」按 0 提交。↑↓ 或 Tab 在选项、答复栏和按钮之间移动，Enter 选定或记下答复。
+- 焦点停在按钮上时打的字会进 Claude Code 的输入框，这时按 Enter 会把它当成一条消息发出去。要写答复，先用 ↓ 移到答复栏再打字。
+- 提交时答过的项合成一条你的消息发给 Claude，例如「我在待定面板里对下面几项的答复（这几项已从面板移除，不用再 resolve）：1. D1 要不要改名 /prod-tune？ → 保持原名」。Claude 正在工作时这条消息排队，它空闲后才收到；没答的项留在列表里；全部答完后面板自己关掉。
+- 你在对话里直接答了某项，或某项已经不用定了，Claude 按系统提示里的说明用同一个工具把它撤掉；它不确定还有哪些待定时，可以不带参数调用这个工具查看。
+- 待定项按会话存在 mod 的存储里，插件重载后还在；新会话从空开始。
+- 系统提示末尾多一段固定说明（222 字），整个会话不变，不破坏 prompt cache。`pending` 工具不经权限确认直接运行，它只改面板里的列表。
+- 列表只在终端和桌面端显示；mobile 端在对话里直接回答。
+
 ## 安全
 
 mod 以你的用户权限在 Claude Code 进程里运行，不在沙箱里。装之前可以对插件目录运行 `claude plugin validate <目录>`，它不执行代码，只列出 mod 处理哪些事件、调用哪些接口：
@@ -109,6 +150,8 @@ mod 以你的用户权限在 Claude Code 进程里运行，不在沙箱里。装
 | shot-view | `tool.call`、`command.run`、`ui.render` | `$.process.run`（只运行 `sips`、`qlmanage`、`open`）、`$.fs.stat`、`$.clock.*`、`$.ui.*`、`$.state.*` |
 | task-eta | `turn.start`、`tool.call`、`turn.complete`、`command.run`、`session.end`、`ui.render` | `$.model.fork`、`$.clock.*`、`$.ui.*` |
 | ctx-slim | `prompt.attachment`、`ui.render`（没配规则时不注册任何钩子） | `$.fs.exists`、`$.fs.ancestors`、`$.env.get`、`$.ui.*`、`$.state.*` |
+| cmds | `session.start`、`command.run`、`turn.complete`、`ui.render` | `$.command.register`、`$.session.cwd`、`$.env.get`（只读 `HOME`、`CLAUDE_CONFIG_DIR`）、`$.fs.list`、`$.fs.read`（只读两个命令目录）、`$.ui.*`、`$.state.*` |
+| decide | `session.start`、`prompt.compose`、`tool.check`（只放行自己的 `pending`）、`tool.call`、`command.run`、`ui.close`、`turn.complete`、`ui.render` | `$.tool.register`、`$.command.register`、`$.prompt.submit`（只在你按提交时）、`$.session.id`、`$.clock.now`、`$.store.*`、`$.ui.*`、`$.state.*` |
 
 ## 开发
 

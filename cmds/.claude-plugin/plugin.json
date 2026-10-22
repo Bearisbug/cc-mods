@@ -1,0 +1,17 @@
+{
+  "name": "cmds",
+  "version": "0.1.0",
+  "description": "自定义斜杠命令速查：/cmds 打开面板，按你配的分组列出 ~/.claude/commands 和项目 .claude/commands 里的命令、参数和用途；空闲时提示行末尾轮换介绍一条",
+  "author": {
+    "name": "Bearisbug"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "groups": {
+      "type": "string",
+      "title": "短命令分组",
+      "description": "格式「组名: 命令 命令; 组名: 命令」，按写的顺序显示；没写进任何组的命令排在「其他」。留空则按名字排成一组。例：开工前: catchup flow; 交给它做: autopilot wf",
+      "default": ""
+    }
+  }
+}

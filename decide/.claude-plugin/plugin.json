@@ -1,0 +1,9 @@
+{
+  "name": "decide",
+  "version": "0.1.0",
+  "description": "等你拍板的事攒成一个列表：Claude 需要你定的事项会登记进来并在右上角提醒，/decide 打开面板，按数字选或写答复，攒几项一起提交给 Claude",
+  "author": {
+    "name": "Bearisbug"
+  },
+  "types": "./types/index.d.ts"
+}
